@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import { format, useI18n } from "@/components/i18n";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,8 @@ export function QuestionEditor({
   onChange: (draft: QuestionDraft) => void;
   onRemove: () => void;
 }) {
+  const dict = useI18n();
+
   return (
     <div className="space-y-3 rounded-lg border p-4">
       <Row className="justify-between">
@@ -30,22 +33,27 @@ export function QuestionEditor({
           <Input
             value={draft.id}
             onChange={(e) => onChange({ ...draft, id: e.target.value })}
-            placeholder="question_id"
+            placeholder={dict.editor.questionId}
             className="h-7 w-44 font-mono text-xs"
-            aria-label="Question id"
+            aria-label={dict.editor.questionId}
           />
         </Row>
-        <Button variant="ghost" size="icon" onClick={onRemove} aria-label={`Remove question ${draft.id}`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          aria-label={`${dict.editor.removeQuestion} ${draft.id}`}
+        >
           <Trash2 className="size-4 text-muted-foreground" />
         </Button>
       </Row>
 
       <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Instructions</Label>
+        <Label className="text-xs text-muted-foreground">{dict.editor.instructions}</Label>
         <Textarea
           value={draft.instructions}
           onChange={(e) => onChange({ ...draft, instructions: e.target.value })}
-          placeholder="What should the model judge?"
+          placeholder={dict.editor.instructionsPlaceholder}
           className="min-h-16 text-sm"
         />
       </div>
@@ -53,20 +61,20 @@ export function QuestionEditor({
       {draft.kind === "noul" && (
         <div className="grid gap-1.5 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Yes means (optional)</Label>
+            <Label className="text-xs text-muted-foreground">{dict.editor.yesMeans}</Label>
             <Input
               value={draft.trueCriteria}
               onChange={(e) => onChange({ ...draft, trueCriteria: e.target.value })}
-              placeholder="Value near 1"
+              placeholder={dict.editor.yesPlaceholder}
               className="text-xs"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">No means (optional)</Label>
+            <Label className="text-xs text-muted-foreground">{dict.editor.noMeans}</Label>
             <Input
               value={draft.falseCriteria}
               onChange={(e) => onChange({ ...draft, falseCriteria: e.target.value })}
-              placeholder="Value near 0"
+              placeholder={dict.editor.noPlaceholder}
               className="text-xs"
             />
           </div>
@@ -76,7 +84,7 @@ export function QuestionEditor({
       {draft.kind === "choice" && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="text-xs text-muted-foreground">Options</Label>
+            <Label className="text-xs text-muted-foreground">{dict.editor.options}</Label>
             <Button
               variant="outline"
               size="sm"
@@ -88,7 +96,7 @@ export function QuestionEditor({
                 })
               }
             >
-              <Plus className="size-3" /> Option
+              <Plus className="size-3" /> {dict.editor.addOption}
             </Button>
           </div>
           <div className="space-y-2">
@@ -101,9 +109,9 @@ export function QuestionEditor({
                     options[index] = { ...option, key: e.target.value };
                     onChange({ ...draft, options });
                   }}
-                  placeholder="key"
+                  placeholder={dict.editor.optionKeyPlaceholder}
                   className="h-8 w-32 font-mono text-xs"
-                  aria-label="Option key"
+                  aria-label={dict.editor.optionKeyPlaceholder}
                 />
                 <Input
                   value={option.description}
@@ -112,9 +120,9 @@ export function QuestionEditor({
                     options[index] = { ...option, description: e.target.value };
                     onChange({ ...draft, options });
                   }}
-                  placeholder="Rubric description (optional)"
+                  placeholder={dict.editor.optionDescriptionPlaceholder}
                   className="h-8 flex-1 text-xs"
-                  aria-label="Option description"
+                  aria-label={dict.editor.optionDescriptionPlaceholder}
                 />
                 <Button
                   variant="ghost"
@@ -124,7 +132,7 @@ export function QuestionEditor({
                   onClick={() =>
                     onChange({ ...draft, options: draft.options.filter((_, i) => i !== index) })
                   }
-                  aria-label={`Remove option ${option.key}`}
+                  aria-label={`${dict.editor.removeOption} ${option.key}`}
                 >
                   <Trash2 className="size-3.5 text-muted-foreground" />
                 </Button>
@@ -137,7 +145,7 @@ export function QuestionEditor({
       {draft.kind === "score" && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="text-xs text-muted-foreground">Levels (ordered, 2–10)</Label>
+            <Label className="text-xs text-muted-foreground">{dict.editor.levels}</Label>
             <Button
               variant="outline"
               size="sm"
@@ -145,7 +153,7 @@ export function QuestionEditor({
               disabled={draft.levels.length >= 10}
               onClick={() => onChange({ ...draft, levels: [...draft.levels, ""] })}
             >
-              <Plus className="size-3" /> Level
+              <Plus className="size-3" /> {dict.editor.addLevel}
             </Button>
           </div>
           <div className="space-y-2">
@@ -159,9 +167,9 @@ export function QuestionEditor({
                     levels[index] = e.target.value;
                     onChange({ ...draft, levels });
                   }}
-                  placeholder={`Description of level ${index}`}
+                  placeholder={format(dict.editor.levelPlaceholder, { index })}
                   className="h-8 flex-1 text-xs"
-                  aria-label={`Level ${index} description`}
+                  aria-label={format(dict.editor.levelPlaceholder, { index })}
                 />
                 <Button
                   variant="ghost"
@@ -169,7 +177,7 @@ export function QuestionEditor({
                   className="size-8"
                   disabled={draft.levels.length <= 2}
                   onClick={() => onChange({ ...draft, levels: draft.levels.filter((_, i) => i !== index) })}
-                  aria-label={`Remove level ${index}`}
+                  aria-label={format(dict.editor.removeLevel, { index })}
                 >
                   <Trash2 className="size-3.5 text-muted-foreground" />
                 </Button>

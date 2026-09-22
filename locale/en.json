@@ -1,0 +1,144 @@
+{
+  "metadata": {
+    "title": "System One Playground",
+    "description": "Test Jev/Kev decision models: typed questions, probabilities, confidence."
+  },
+  "header": {
+    "title": "System One Playground",
+    "subtitle": "Send typed questions (noul, choice, score) over a state and visualize the judgments."
+  },
+  "preset": {
+    "label": "Preset",
+    "none": "No preset"
+  },
+  "provider": {
+    "label": "Provider",
+    "hosted": "Jev (hosted)",
+    "local": "Kev (local)"
+  },
+  "model": {
+    "label": "Model",
+    "custom": "Custom…",
+    "placeholder": "model id"
+  },
+  "actions": {
+    "run": "Run",
+    "settings": "Settings",
+    "language": "Language"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Endpoint and credentials for {provider}. Leave empty to use the provider default or server environment.",
+    "apiUrl": "API URL",
+    "apiUrlHint": "Base origin without /v1. Default: {url}",
+    "apiUrlHintLocal": " (or server KEV_BASE_URL)",
+    "apiKey": "API key",
+    "apiKeyHint": "Sent as a Bearer token by this app's server. Falls back to TYPESAFE_API_KEY when empty.",
+    "apiKeyPlaceholderHosted": "sk-… (or server TYPESAFE_API_KEY)",
+    "apiKeyPlaceholderLocal": "not required for kev",
+    "showKey": "Show API key",
+    "hideKey": "Hide API key"
+  },
+  "state": {
+    "title": "State",
+    "single": "Single",
+    "bulk": "Bulk",
+    "kindText": "text",
+    "kindArray": "json array",
+    "kindObject": "json object",
+    "description": "Text or JSON. JSON is parsed and sent as structured state; reference fields with backticked paths in instructions.",
+    "placeholder": "The content to evaluate…"
+  },
+  "bulk": {
+    "delimiter": "Delimiter",
+    "newline": "Newline",
+    "comma": "Comma",
+    "semicolon": "Semicolon",
+    "tab": "Tab",
+    "jsonl": "JSONL",
+    "description": "Many states, the same questions. Split states by the delimiter; each piece is parsed like a single state. JSONL parses each line as JSON. Pasting from Excel works with Tab.",
+    "placeholder": "One state per line…",
+    "statesCount": "{count} states",
+    "stateColumn": "State",
+    "empty": "No states to evaluate.",
+    "limit": "Bulk mode allows at most {max} states (parsed {count}).",
+    "progress": "{done}/{total} states",
+    "failedCount": "{count} failed",
+    "avgLatency": "Avg latency: ",
+    "tokens": "Tokens: ",
+    "rowFailed": "Failed",
+    "rowPending": "Pending",
+    "rowRunning": "Running…"
+  },
+  "questions": {
+    "label": "Questions",
+    "description": "Evaluated in parallel against the same state, each answered independently.",
+    "add": "Add question",
+    "empty": "No questions yet. Add a noul, choice, or score.",
+    "noul": {
+      "label": "Noul",
+      "description": "Yes/no judgment over the state, answered as a probability between 0 and 1."
+    },
+    "choice": {
+      "label": "Choice",
+      "description": "Pick the best option from a list of keys, each with an optional rubric description."
+    },
+    "score": {
+      "label": "Score",
+      "description": "Rate the state against an ordered rubric of levels (2–10), answered as a level index."
+    }
+  },
+  "editor": {
+    "instructions": "Instructions",
+    "instructionsPlaceholder": "What should the model judge?",
+    "questionId": "question_id",
+    "yesMeans": "Yes means (optional)",
+    "yesPlaceholder": "Value near 1",
+    "noMeans": "No means (optional)",
+    "noPlaceholder": "Value near 0",
+    "options": "Options",
+    "addOption": "Option",
+    "optionKeyPlaceholder": "key",
+    "optionDescriptionPlaceholder": "Rubric description (optional)",
+    "levels": "Levels (ordered, 2–10)",
+    "addLevel": "Level",
+    "levelPlaceholder": "Description of level {index}",
+    "removeQuestion": "Remove question",
+    "removeOption": "Remove option",
+    "removeLevel": "Remove level {index}"
+  },
+  "toasts": {
+    "stateEmpty": "State is empty.",
+    "pickModel": "Pick a model.",
+    "invalidUrl": "API URL is not a valid URL.",
+    "requestFailed": "Request failed ({status})"
+  },
+  "tabs": {
+    "answers": "Answers",
+    "request": "Request JSON",
+    "response": "Response JSON"
+  },
+  "answers": {
+    "empty": "Run an evaluation to see answers, probability distributions, and confidence.",
+    "requestEmpty": "Run an evaluation to see the request payload.",
+    "responseEmpty": "Run an evaluation to see the raw response.",
+    "model": "Model: ",
+    "latency": "Latency: ",
+    "tokens": "Tokens: ",
+    "tokensInOut": "{input} in / {output} out",
+    "provider": "Provider: ",
+    "selected": "Selected: ",
+    "confidence": "Confidence",
+    "noulDescription": "Probability the answer is yes. Noul has no separate confidence.",
+    "pYes": "P(yes)",
+    "scaleNo": "0 — no",
+    "scaleMid": "0.5",
+    "scaleYes": "1 — yes",
+    "strongYes": "Strong yes",
+    "strongNo": "Strong no",
+    "uncertain": "Uncertain (near 0.5)",
+    "level": "Level {level}",
+    "scored": "Scored {score} on a 0–{max} scale (can land between levels)."
+  },
+  "footer": "Requests proxy through this app's server route. API URL and key set above take precedence; otherwise TYPESAFE_API_KEY (hosted) and KEV_BASE_URL (local, default http://127.0.0.1:8008) come from the server environment. Both providers speak the same /v1/systemone contract."
+}

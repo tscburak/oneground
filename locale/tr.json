@@ -1,0 +1,144 @@
+{
+  "metadata": {
+    "title": "System One Playground",
+    "description": "Jev/Kev karar modellerini test edin: tipli sorular, olasılıklar, güven."
+  },
+  "header": {
+    "title": "System One Playground",
+    "subtitle": "Bir durum üzerinden tipli sorular (noul, choice, score) gönderin ve kararları görselleştirin."
+  },
+  "preset": {
+    "label": "Ön ayar",
+    "none": "Ön ayar yok"
+  },
+  "provider": {
+    "label": "Sağlayıcı",
+    "hosted": "Jev (barındırılan)",
+    "local": "Kev (yerel)"
+  },
+  "model": {
+    "label": "Model",
+    "custom": "Özel…",
+    "placeholder": "model kimliği"
+  },
+  "actions": {
+    "run": "Çalıştır",
+    "settings": "Ayarlar",
+    "language": "Dil"
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "description": "{provider} için uç nokta ve kimlik bilgileri. Sağlayıcı varsayılanını veya sunucu ortamını kullanmak için boş bırakın.",
+    "apiUrl": "API URL'si",
+    "apiUrlHint": "/v1 olmadan temel origin. Varsayılan: {url}",
+    "apiUrlHintLocal": " (veya sunucu KEV_BASE_URL)",
+    "apiKey": "API anahtarı",
+    "apiKeyHint": "Bu uygulamanın sunucusu tarafından Bearer token olarak gönderilir. Boş bırakıldığında TYPESAFE_API_KEY'e düşer.",
+    "apiKeyPlaceholderHosted": "sk-… (veya sunucu TYPESAFE_API_KEY)",
+    "apiKeyPlaceholderLocal": "kev için gerekli değil",
+    "showKey": "API anahtarını göster",
+    "hideKey": "API anahtarını gizle"
+  },
+  "state": {
+    "title": "Durum",
+    "single": "Tek",
+    "bulk": "Toplu",
+    "kindText": "metin",
+    "kindArray": "json dizisi",
+    "kindObject": "json nesnesi",
+    "description": "Metin veya JSON. JSON ayrıştırılır ve yapılandırılmış durum olarak gönderilir; alanlara yönergeler içinde ters tırnak içindeki yollarla başvurun.",
+    "placeholder": "Değerlendirilecek içerik…"
+  },
+  "bulk": {
+    "delimiter": "Ayırıcı",
+    "newline": "Yeni satır",
+    "comma": "Virgül",
+    "semicolon": "Noktalı virgül",
+    "tab": "Sekme",
+    "jsonl": "JSONL",
+    "description": "Çok durum, aynı sorular. Durumları ayırıcıya göre bölün; her parça tek durum gibi ayrıştırılır. JSONL her satırı JSON olarak ayrıştırır. Excel'den yapıştırmak Sekme ile çalışır.",
+    "placeholder": "Satır başına bir durum…",
+    "statesCount": "{count} durum",
+    "stateColumn": "Durum",
+    "empty": "Değerlendirilecek durum yok.",
+    "limit": "Toplu mod en fazla {max} duruma izin verir ({count} ayrıştırıldı).",
+    "progress": "{done}/{total} durum",
+    "failedCount": "{count} başarısız",
+    "avgLatency": "Ort. gecikme: ",
+    "tokens": "Token: ",
+    "rowFailed": "Başarısız",
+    "rowPending": "Bekliyor",
+    "rowRunning": "Çalışıyor…"
+  },
+  "questions": {
+    "label": "Sorular",
+    "description": "Aynı duruma karşı paralel olarak değerlendirilir, her biri bağımsız yanıtlanır.",
+    "add": "Soru ekle",
+    "empty": "Henüz soru yok. Bir noul, choice veya score ekleyin.",
+    "noul": {
+      "label": "Noul",
+      "description": "Durum üzerinde evet/hayır kararı, 0 ile 1 arasında olasılık olarak yanıtlanır."
+    },
+    "choice": {
+      "label": "Choice",
+      "description": "Anahtar listesinden en iyi seçeneği seçer; her anahtar isteğe bağlı bir değerlendirme açıklamasına sahiptir."
+    },
+    "score": {
+      "label": "Score",
+      "description": "Durumu sıralı bir düzey ölçeğine (2–10) göre puanlar, düzey indeksi olarak yanıtlanır."
+    }
+  },
+  "editor": {
+    "instructions": "Yönergeler",
+    "instructionsPlaceholder": "Model neyi değerlendirmeli?",
+    "questionId": "soru_kimliği",
+    "yesMeans": "Evet anlamı (isteğe bağlı)",
+    "yesPlaceholder": "1'e yakın değer",
+    "noMeans": "Hayır anlamı (isteğe bağlı)",
+    "noPlaceholder": "0'a yakın değer",
+    "options": "Seçenekler",
+    "addOption": "Seçenek",
+    "optionKeyPlaceholder": "anahtar",
+    "optionDescriptionPlaceholder": "Değerlendirme açıklaması (isteğe bağlı)",
+    "levels": "Düzeyler (sıralı, 2–10)",
+    "addLevel": "Düzey",
+    "levelPlaceholder": "{index} düzeyinin açıklaması",
+    "removeQuestion": "Soruyu kaldır",
+    "removeOption": "Seçeneği kaldır",
+    "removeLevel": "{index} düzeyini kaldır"
+  },
+  "toasts": {
+    "stateEmpty": "Durum boş.",
+    "pickModel": "Bir model seçin.",
+    "invalidUrl": "API URL'si geçerli bir URL değil.",
+    "requestFailed": "İstek başarısız ({status})"
+  },
+  "tabs": {
+    "answers": "Yanıtlar",
+    "request": "İstek JSON",
+    "response": "Yanıt JSON"
+  },
+  "answers": {
+    "empty": "Yanıtları, olasılık dağılımlarını ve güveni görmek için bir değerlendirme çalıştırın.",
+    "requestEmpty": "İstek yükünü görmek için bir değerlendirme çalıştırın.",
+    "responseEmpty": "Ham yanıtı görmek için bir değerlendirme çalıştırın.",
+    "model": "Model: ",
+    "latency": "Gecikme: ",
+    "tokens": "Token: ",
+    "tokensInOut": "{input} giriş / {output} çıkış",
+    "provider": "Sağlayıcı: ",
+    "selected": "Seçilen: ",
+    "confidence": "Güven",
+    "noulDescription": "Yanıtın evet olma olasılığı. Noul'un ayrı bir güven ölçüsü yoktur.",
+    "pYes": "P(evet)",
+    "scaleNo": "0 — hayır",
+    "scaleMid": "0,5",
+    "scaleYes": "1 — evet",
+    "strongYes": "Kuvvetli evet",
+    "strongNo": "Kuvvetli hayır",
+    "uncertain": "Belirsiz (0,5'e yakın)",
+    "level": "Düzey {level}",
+    "scored": "{score} puanı, 0–{max} ölçeğinde (düzeyler arası düşebilir)."
+  },
+  "footer": "İstekler bu uygulamanın sunucu rotası üzerinden yürütülür. Yukarıda ayarlanan API URL'si ve anahtar önceliklidir; aksi halde TYPESAFE_API_KEY (barındırılan) ve KEV_BASE_URL (yerel, varsayılan http://127.0.0.1:8008) sunucu ortamından gelir. Her iki sağlayıcı da aynı /v1/systemone sözleşmesini konuşur."
+}

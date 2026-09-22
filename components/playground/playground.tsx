@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, Loader2, Play, Settings } from "lucide-react";
+import { Eye, EyeOff, Loader2, Play, Plus, Settings } from "lucide-react";
 import { toast } from "sonner";
+import { format, useI18n } from "@/components/i18n";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 import { AnswerCard } from "@/components/playground/answer-card";
 import { QuestionEditor } from "@/components/playground/question-editor";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +24,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,13 +43,20 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PRESETS } from "@/lib/presets";
+import { cn } from "@/lib/utils";
 import {
+  BULK_CONCURRENCY,
+  BULK_MAX_STATES,
   buildQuestions,
   nextQuestionId,
+  parseBulkStates,
   parseState,
+  previewState,
   PROVIDER_DEFAULT_MODEL,
   PROVIDER_MODELS,
   validateDrafts,
+  type Answer,
+  type BulkDelimiter,
   type EvaluateResponse,
   type JsonStructure,
   type Provider,
@@ -62,13 +77,170 @@ type RunResult = {
   answerOrder: string[];
 };
 
-function stateKind(state: JsonStructure): string {
-  if (typeof state === "string") return "text";
-  if (Array.isArray(state)) return "json array";
-  return "json object";
+type BulkStateResult = {
+  state: JsonStructure;
+  status: "pending" | "running" | "done" | "error";
+  response: EvaluateResponse | null;
+  error: string | null;
+};
+
+type BulkRunResult = {
+  model: string;
+  questions: QuestionsMap;
+  answerOrder: string[];
+  results: BulkStateResult[];
+};
+
+type StateMode = "single" | "bulk";
+
+function stateKind(state: JsonStructure): "kindText" | "kindArray" | "kindObject" {
+  if (typeof state === "string") return "kindText";
+  if (Array.isArray(state)) return "kindArray";
+  return "kindObject";
+}
+
+function pctShort(value: number): string {
+  return `${(value * 100).toFixed(0)}%`;
+}
+
+function BulkAnswerCell({ answer }: { answer: Answer | undefined }) {
+  if (!answer) return <span className="text-muted-foreground">—</span>;
+  if (answer.type === "noul") {
+    const tone =
+      answer.noul >= 0.75
+        ? "text-emerald-600 dark:text-emerald-400"
+        : answer.noul <= 0.25
+          ? "text-red-600 dark:text-red-400"
+          : "";
+    return (
+      <span className={cn("font-mono text-xs tabular-nums", tone)}>
+        {answer.noul.toFixed(3)}
+      </span>
+    );
+  }
+  if (answer.type === "choice") {
+    return (
+      <span className="font-mono text-xs">
+        {answer.choice}
+        <span className="ml-1 text-muted-foreground">
+          {pctShort(answer.probabilities[answer.choice] ?? 0)}
+        </span>
+      </span>
+    );
+  }
+  return <span className="font-mono text-xs tabular-nums">{answer.score.toFixed(2)}</span>;
+}
+
+function BulkAnswers({ bulkResult, running }: { bulkResult: BulkRunResult; running: boolean }) {
+  const dict = useI18n();
+  const { results, answerOrder, model } = bulkResult;
+  const done = results.filter((r) => r.status === "done" || r.status === "error").length;
+  const ok = results.filter((r) => r.status === "done");
+  const failed = results.filter((r) => r.status === "error").length;
+  const avgLatency = ok.length
+    ? Math.round(ok.reduce((sum, r) => sum + (r.response?.latencyMs ?? 0), 0) / ok.length)
+    : 0;
+  const tokens = ok.reduce(
+    (sum, r) =>
+      sum + (r.response?.usage?.input_tokens ?? 0) + (r.response?.usage?.output_tokens ?? 0),
+    0
+  );
+
+  return (
+    <>
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 py-4 text-sm">
+          <div>
+            <span className="text-muted-foreground">{dict.answers.model}</span>
+            <span className="font-mono">{model}</span>
+          </div>
+          <div>
+            <span className="font-mono">
+              {format(dict.bulk.progress, { done, total: results.length })}
+              {running ? ` — ${dict.bulk.rowRunning}` : ""}
+            </span>
+          </div>
+          {avgLatency > 0 && (
+            <div>
+              <span className="text-muted-foreground">{dict.bulk.avgLatency}</span>
+              <span className="font-mono">{avgLatency} ms</span>
+            </div>
+          )}
+          {tokens > 0 && (
+            <div>
+              <span className="text-muted-foreground">{dict.bulk.tokens}</span>
+              <span className="font-mono">{tokens}</span>
+            </div>
+          )}
+          {failed > 0 && (
+            <div>
+              <span className="text-red-600 dark:text-red-400">
+                {format(dict.bulk.failedCount, { count: failed })}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/50">
+              <th className="px-3 py-2 text-left font-medium">
+                {dict.bulk.stateColumn}
+              </th>
+              {answerOrder.map((id) => (
+                <th key={id} className="px-3 py-2 text-left font-mono text-xs font-medium">
+                  {id}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {results.map((row, index) => (
+              <tr key={index} className="border-b align-top last:border-b-0">
+                <td className="max-w-72 px-3 py-2">
+                  <span
+                    className="block truncate font-mono text-xs"
+                    title={previewState(row.state, 1000)}
+                  >
+                    {previewState(row.state)}
+                  </span>
+                  {row.status === "error" && (
+                    <span
+                      className="block truncate text-xs text-red-600 dark:text-red-400"
+                      title={row.error ?? undefined}
+                    >
+                      {dict.bulk.rowFailed}: {row.error}
+                    </span>
+                  )}
+                </td>
+                {answerOrder.map((id) => {
+                  const answer = row.response?.answers[id];
+                  return (
+                    <td key={id} className="px-3 py-2">
+                      {row.status === "done" ? (
+                        <BulkAnswerCell answer={answer} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {row.status === "running"
+                            ? dict.bulk.rowRunning
+                            : dict.bulk.rowPending}
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
 }
 
 export function Playground() {
+  const dict = useI18n();
   const [preset, setPreset] = useState<string>("none");
   const [provider, setProvider] = useState<Provider>("hosted");
   const [modelChoice, setModelChoice] = useState<string>(PROVIDER_DEFAULT_MODEL.hosted);
@@ -76,12 +248,17 @@ export function Playground() {
   const [baseUrl, setBaseUrl] = useState<string>(PROVIDER_BASE_URL.hosted);
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const [stateText, setStateText] = useState<string>(PRESETS[0].state);
-  const [drafts, setDrafts] = useState<QuestionDraft[]>(PRESETS[0].questions);
+  const [stateMode, setStateMode] = useState<StateMode>("single");
+  const [delimiter, setDelimiter] = useState<BulkDelimiter>("newline");
+  const [stateText, setStateText] = useState<string>("");
+  const [bulkText, setBulkText] = useState<string>("");
+  const [drafts, setDrafts] = useState<QuestionDraft[]>([]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<RunResult | null>(null);
+  const [bulkResult, setBulkResult] = useState<BulkRunResult | null>(null);
 
   const parsedState = useMemo(() => parseState(stateText), [stateText]);
+  const bulkStates = useMemo(() => parseBulkStates(bulkText, delimiter), [bulkText, delimiter]);
   const model = modelChoice === CUSTOM_MODEL ? customModel.trim() : modelChoice;
 
   function applyProvider(next: Provider) {
@@ -93,12 +270,20 @@ export function Playground() {
 
   function applyPreset(name: string) {
     setPreset(name);
-    if (name === "none") return;
+    if (name === "none") {
+      setStateText("");
+      setBulkText("");
+      setDrafts([]);
+      setResult(null);
+      setBulkResult(null);
+      return;
+    }
     const found = PRESETS.find((p) => p.name === name);
     if (!found) return;
     setStateText(found.state);
     setDrafts(found.questions.map((q) => ({ ...q })));
     setResult(null);
+    setBulkResult(null);
   }
 
   function addDraft(kind: QuestionDraft["kind"]) {
@@ -125,57 +310,136 @@ export function Playground() {
     });
   }
 
+  async function evaluateOne(
+    state: JsonStructure,
+    questions: QuestionsMap
+  ): Promise<EvaluateResponse> {
+    const res = await fetch("/api/evaluate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        state,
+        model,
+        questions,
+        provider,
+        baseUrl: baseUrl.trim(),
+        apiKey: apiKey.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const error = new Error(
+        data.error ?? format(dict.toasts.requestFailed, { status: res.status })
+      ) as Error & { upstream?: unknown };
+      if (data.upstream) error.upstream = data.upstream;
+      throw error;
+    }
+    return data as EvaluateResponse;
+  }
+
+  async function runBulk(questions: QuestionsMap) {
+    const states = bulkStates;
+    const answerOrder = drafts.map((d) => d.id);
+    setBulkResult({
+      model,
+      questions,
+      answerOrder,
+      results: states.map((state) => ({
+        state,
+        status: "pending" as const,
+        response: null,
+        error: null,
+      })),
+    });
+    let cursor = 0;
+    const update = (index: number, patch: Partial<BulkStateResult>) => {
+      setBulkResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              results: prev.results.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+            }
+          : prev
+      );
+    };
+    const worker = async () => {
+      for (;;) {
+        const index = cursor++;
+        if (index >= states.length) return;
+        update(index, { status: "running" });
+        try {
+          const response = await evaluateOne(states[index], questions);
+          update(index, { status: "done", response });
+        } catch (error) {
+          update(index, {
+            status: "error",
+            error: String((error as Error)?.message ?? error),
+          });
+        }
+      }
+    };
+    setRunning(true);
+    try {
+      await Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, states.length) }, worker));
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function run() {
     const validationError = validateDrafts(drafts);
     if (validationError) {
       toast.error(validationError);
       return;
     }
-    if (parsedState === null) {
-      toast.error("State is empty.");
-      return;
-    }
     if (!model) {
-      toast.error("Pick a model.");
+      toast.error(dict.toasts.pickModel);
       return;
     }
-
-    const questions = buildQuestions(drafts);
-    const request = { state: parsedState, model, questions };
 
     const trimmedBaseUrl = baseUrl.trim();
     if (trimmedBaseUrl) {
       try {
         new URL(trimmedBaseUrl);
       } catch {
-        toast.error("API URL is not a valid URL.");
+        toast.error(dict.toasts.invalidUrl);
         return;
       }
     }
 
-    setRunning(true);
-    try {
-      const res = await fetch("/api/evaluate", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          ...request,
-          provider,
-          model,
-          baseUrl: trimmedBaseUrl,
-          apiKey: apiKey.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error ?? `Request failed (${res.status})`, {
-          description: data.upstream ? JSON.stringify(data.upstream, null, 2) : undefined,
-        });
+    const questions = buildQuestions(drafts);
+
+    if (stateMode === "bulk") {
+      if (bulkStates.length === 0) {
+        toast.error(dict.bulk.empty);
         return;
       }
-      setResult({ response: data, request, answerOrder: drafts.map((d) => d.id) });
+      if (bulkStates.length > BULK_MAX_STATES) {
+        toast.error(format(dict.bulk.limit, { max: BULK_MAX_STATES, count: bulkStates.length }));
+        return;
+      }
+      await runBulk(questions);
+      return;
+    }
+
+    if (parsedState === null) {
+      toast.error(dict.toasts.stateEmpty);
+      return;
+    }
+
+    setRunning(true);
+    try {
+      const response = await evaluateOne(parsedState, questions);
+      setResult({
+        response,
+        request: { state: parsedState, model, questions },
+        answerOrder: drafts.map((d) => d.id),
+      });
     } catch (error) {
-      toast.error(String(error));
+      const upstream = (error as { upstream?: unknown }).upstream;
+      toast.error(String((error as Error)?.message ?? error), {
+        description: upstream ? JSON.stringify(upstream, null, 2) : undefined,
+      });
     } finally {
       setRunning(false);
     }
@@ -187,18 +451,17 @@ export function Playground() {
     <div className="mx-auto w-full max-w-7xl px-6 py-8">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">System One Playground</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Send typed questions (noul, choice, score) over a state and visualize the judgments.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{dict.header.title}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{dict.header.subtitle}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <LocaleSwitcher />
           <Select value={preset} onValueChange={applyPreset}>
-            <SelectTrigger className="h-9 w-44" aria-label="Preset">
-              <SelectValue placeholder="Preset" />
+            <SelectTrigger className="h-9 w-44" aria-label={dict.preset.label}>
+              <SelectValue placeholder={dict.preset.label} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No preset</SelectItem>
+              <SelectItem value="none">{dict.preset.none}</SelectItem>
               {PRESETS.map((p) => (
                 <SelectItem key={p.name} value={p.name}>
                   {p.name}
@@ -207,12 +470,12 @@ export function Playground() {
             </SelectContent>
           </Select>
           <Select value={provider} onValueChange={(v) => applyProvider(v as Provider)}>
-            <SelectTrigger className="h-9 w-36" aria-label="Provider">
+            <SelectTrigger className="h-9 w-36" aria-label={dict.provider.label}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="hosted">Jev (hosted)</SelectItem>
-              <SelectItem value="local">Kev (local)</SelectItem>
+              <SelectItem value="hosted">{dict.provider.hosted}</SelectItem>
+              <SelectItem value="local">{dict.provider.local}</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -222,7 +485,7 @@ export function Playground() {
               if (v !== CUSTOM_MODEL) setCustomModel("");
             }}
           >
-            <SelectTrigger className="h-9 w-44" aria-label="Model">
+            <SelectTrigger className="h-9 w-44" aria-label={dict.model.label}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -231,39 +494,40 @@ export function Playground() {
                   {m}
                 </SelectItem>
               ))}
-              <SelectItem value={CUSTOM_MODEL}>Custom…</SelectItem>
+              <SelectItem value={CUSTOM_MODEL}>{dict.model.custom}</SelectItem>
             </SelectContent>
           </Select>
           {modelChoice === CUSTOM_MODEL && (
             <Input
               value={customModel}
               onChange={(e) => setCustomModel(e.target.value)}
-              placeholder="model id"
+              placeholder={dict.model.placeholder}
               className="h-9 w-36 font-mono text-xs"
             />
           )}
           <Button onClick={run} disabled={running} className="h-9">
             {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-            Run
+            {dict.actions.run}
           </Button>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" size="icon" className="size-9" aria-label="Settings">
+              <Button variant="outline" size="icon" className="size-9" aria-label={dict.actions.settings}>
                 <Settings className="size-4" />
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Settings</DialogTitle>
+                <DialogTitle>{dict.settings.title}</DialogTitle>
                 <DialogDescription>
-                  Endpoint and credentials for{" "}
-                  {provider === "hosted" ? "Jev (hosted)" : "Kev (local)"}. Leave empty to use the
-                  provider default or server environment.
+                  {format(dict.settings.description, {
+                    provider:
+                      provider === "hosted" ? dict.provider.hosted : dict.provider.local,
+                  })}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="api-url">API URL</Label>
+                  <Label htmlFor="api-url">{dict.settings.apiUrl}</Label>
                   <Input
                     id="api-url"
                     value={baseUrl}
@@ -272,13 +536,12 @@ export function Playground() {
                     className="h-9 font-mono text-xs"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Base origin without <code className="font-mono">/v1</code>. Default:{" "}
-                    <code className="font-mono">{PROVIDER_BASE_URL[provider]}</code>
-                    {provider === "local" && " (or server KEV_BASE_URL)"}.
+                    {format(dict.settings.apiUrlHint, { url: PROVIDER_BASE_URL[provider] })}
+                    {provider === "local" && dict.settings.apiUrlHintLocal}.
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="api-key">API key</Label>
+                  <Label htmlFor="api-key">{dict.settings.apiKey}</Label>
                   <div className="relative">
                     <Input
                       id="api-key"
@@ -286,7 +549,9 @@ export function Playground() {
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder={
-                        provider === "hosted" ? "sk-… (or server TYPESAFE_API_KEY)" : "not required for kev"
+                        provider === "hosted"
+                          ? dict.settings.apiKeyPlaceholderHosted
+                          : dict.settings.apiKeyPlaceholderLocal
                       }
                       className="h-9 pr-10 font-mono text-xs"
                       autoComplete="off"
@@ -295,15 +560,14 @@ export function Playground() {
                       type="button"
                       onClick={() => setShowApiKey((v) => !v)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                      aria-label={
+                        showApiKey ? dict.settings.hideKey : dict.settings.showKey
+                      }
                     >
                       {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Sent as a Bearer token by this app&apos;s server. Falls back to{" "}
-                    <code className="font-mono">TYPESAFE_API_KEY</code> when empty.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{dict.settings.apiKeyHint}</p>
                 </div>
               </div>
             </DialogContent>
@@ -315,55 +579,123 @@ export function Playground() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <CardTitle>State</CardTitle>
-                {parsedState !== null && (
-                  <Badge variant="outline" className="font-mono text-xs">
-                    {stateKind(parsedState)}
-                  </Badge>
-                )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle>{dict.state.title}</CardTitle>
+                  {stateMode === "single" && parsedState !== null && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {dict.state[stateKind(parsedState)]}
+                    </Badge>
+                  )}
+                  {stateMode === "bulk" && bulkStates.length > 0 && (
+                    <Badge variant="outline" className="font-mono text-xs">
+                      {format(dict.bulk.statesCount, { count: bulkStates.length })}
+                    </Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {stateMode === "bulk" && (
+                    <Select
+                      value={delimiter}
+                      onValueChange={(v) => setDelimiter(v as BulkDelimiter)}
+                    >
+                      <SelectTrigger className="h-8 w-36 text-xs" aria-label={dict.bulk.delimiter}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="newline">{dict.bulk.newline}</SelectItem>
+                        <SelectItem value="comma">{dict.bulk.comma}</SelectItem>
+                        <SelectItem value="semicolon">{dict.bulk.semicolon}</SelectItem>
+                        <SelectItem value="tab">{dict.bulk.tab}</SelectItem>
+                        <SelectItem value="jsonl">{dict.bulk.jsonl}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Tabs
+                    value={stateMode}
+                    onValueChange={(v) => setStateMode(v as StateMode)}
+                  >
+                    <TabsList className="h-8">
+                      <TabsTrigger value="single" className="h-7 px-3 text-xs">
+                        {dict.state.single}
+                      </TabsTrigger>
+                      <TabsTrigger value="bulk" className="h-7 px-3 text-xs">
+                        {dict.state.bulk}
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
               </div>
               <CardDescription>
-                Text or JSON. JSON is parsed and sent as structured state; reference fields with
-                backticked paths in instructions.
+                {stateMode === "single" ? dict.state.description : dict.bulk.description}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Textarea
-                value={stateText}
-                onChange={(e) => setStateText(e.target.value)}
-                placeholder="The content to evaluate…"
-                className="min-h-40 font-mono text-xs"
-              />
+              {stateMode === "single" ? (
+                <Textarea
+                  value={stateText}
+                  onChange={(e) => setStateText(e.target.value)}
+                  placeholder={dict.state.placeholder}
+                  className="min-h-40 font-mono text-xs"
+                />
+              ) : (
+                <Textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  placeholder={dict.bulk.placeholder}
+                  className="min-h-40 font-mono text-xs"
+                />
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Questions</CardTitle>
-                  <CardDescription className="mt-1.5">
-                    Evaluated in parallel against the same state, each answered independently.
-                  </CardDescription>
-                </div>
-                <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addDraft("noul")}>
-                    + Noul
+              <CardTitle>{dict.questions.label}</CardTitle>
+              <CardDescription className="mt-1.5">
+                {dict.questions.description}
+              </CardDescription>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="mt-1 h-7 text-xs">
+                    <Plus className="size-3" /> {dict.questions.add}
                   </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addDraft("choice")}>
-                    + Choice
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => addDraft("score")}>
-                    + Score
-                  </Button>
-                </div>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-72">
+                  <DropdownMenuItem
+                    className="flex-col items-start gap-0.5"
+                    onSelect={() => addDraft("noul")}
+                  >
+                    <span className="font-medium">{dict.questions.noul.label}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dict.questions.noul.description}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="flex-col items-start gap-0.5"
+                    onSelect={() => addDraft("choice")}
+                  >
+                    <span className="font-medium">{dict.questions.choice.label}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dict.questions.choice.description}
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="flex-col items-start gap-0.5"
+                    onSelect={() => addDraft("score")}
+                  >
+                    <span className="font-medium">{dict.questions.score.label}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {dict.questions.score.description}
+                    </span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </CardHeader>
             <CardContent className="space-y-3">
               {drafts.length === 0 && (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  No questions yet. Add a noul, choice, or score.
+                  {dict.questions.empty}
                 </p>
               )}
               {drafts.map((draft, index) => (
@@ -383,43 +715,44 @@ export function Playground() {
         <div className="min-w-0">
           <Tabs defaultValue="answers">
             <TabsList>
-              <TabsTrigger value="answers">Answers</TabsTrigger>
-              <TabsTrigger value="request">Request JSON</TabsTrigger>
-              <TabsTrigger value="response">Response JSON</TabsTrigger>
+              <TabsTrigger value="answers">{dict.tabs.answers}</TabsTrigger>
+              <TabsTrigger value="request">{dict.tabs.request}</TabsTrigger>
+              <TabsTrigger value="response">{dict.tabs.response}</TabsTrigger>
             </TabsList>
             <TabsContent value="answers" className="mt-4 space-y-4">
-              {!result && (
+              {stateMode === "bulk" && bulkResult ? (
+                <BulkAnswers bulkResult={bulkResult} running={running} />
+              ) : stateMode === "bulk" || !result ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Run an evaluation to see answers, probability distributions, and confidence.
-                    </p>
+                    <p className="text-sm text-muted-foreground">{dict.answers.empty}</p>
                   </CardContent>
                 </Card>
-              )}
-              {result && (
+              ) : (
                 <>
                   <Card>
                     <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 py-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Model: </span>
+                        <span className="text-muted-foreground">{dict.answers.model}</span>
                         <span className="font-mono">{result.response.model}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Latency: </span>
+                        <span className="text-muted-foreground">{dict.answers.latency}</span>
                         <span className="font-mono">{result.response.latencyMs} ms</span>
                       </div>
                       {result.response.usage && (
                         <div>
-                          <span className="text-muted-foreground">Tokens: </span>
+                          <span className="text-muted-foreground">{dict.answers.tokens}</span>
                           <span className="font-mono">
-                            {result.response.usage.input_tokens ?? 0} in /{" "}
-                            {result.response.usage.output_tokens ?? 0} out
+                            {format(dict.answers.tokensInOut, {
+                              input: result.response.usage.input_tokens ?? 0,
+                              output: result.response.usage.output_tokens ?? 0,
+                            })}
                           </span>
                         </div>
                       )}
                       <div>
-                        <span className="text-muted-foreground">Provider: </span>
+                        <span className="text-muted-foreground">{dict.answers.provider}</span>
                         <span className="font-mono">{result.response.provider}</span>
                       </div>
                     </CardContent>
@@ -436,9 +769,19 @@ export function Playground() {
               <Card>
                 <CardContent className="py-0">
                   <pre className="max-h-[70vh] overflow-auto p-4 font-mono text-xs leading-relaxed">
-                    {result
-                      ? JSON.stringify(result.request, null, 2)
-                      : "Run an evaluation to see the request payload."}
+                    {stateMode === "bulk" && bulkResult
+                      ? JSON.stringify(
+                          bulkResult.results.map((r) => ({
+                            state: r.state,
+                            model: bulkResult.model,
+                            questions: bulkResult.questions,
+                          })),
+                          null,
+                          2
+                        )
+                      : result
+                        ? JSON.stringify(result.request, null, 2)
+                        : dict.answers.requestEmpty}
                   </pre>
                 </CardContent>
               </Card>
@@ -447,9 +790,15 @@ export function Playground() {
               <Card>
                 <CardContent className="py-0">
                   <pre className="max-h-[70vh] overflow-auto p-4 font-mono text-xs leading-relaxed">
-                    {result
-                      ? JSON.stringify(result.response, null, 2)
-                      : "Run an evaluation to see the raw response."}
+                    {stateMode === "bulk" && bulkResult
+                      ? JSON.stringify(
+                          bulkResult.results.map((r) => r.response ?? { error: r.error }),
+                          null,
+                          2
+                        )
+                      : result
+                        ? JSON.stringify(result.response, null, 2)
+                        : dict.answers.responseEmpty}
                   </pre>
                 </CardContent>
               </Card>
@@ -459,14 +808,7 @@ export function Playground() {
       </div>
 
       <Separator className="my-10" />
-      <footer className="pb-8 text-xs text-muted-foreground">
-        Requests proxy through this app&apos;s server route. API URL and key set above take
-        precedence; otherwise <code className="font-mono">TYPESAFE_API_KEY</code> (hosted) and{" "}
-        <code className="font-mono">KEV_BASE_URL</code> (local, default{" "}
-        <code className="font-mono">http://127.0.0.1:8008</code>) come from the server
-        environment. Both providers speak the same{" "}
-        <code className="font-mono">/v1/systemone</code> contract.
-      </footer>
+      <footer className="pb-8 text-xs text-muted-foreground">{dict.footer}</footer>
     </div>
   );
 }

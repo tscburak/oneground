@@ -14,6 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
+import { format, useI18n } from "@/components/i18n";
 import {
   Card,
   CardContent,
@@ -34,10 +35,11 @@ function pct(value: number): string {
 }
 
 function ConfidenceMeter({ value }: { value: number }) {
+  const dict = useI18n();
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Confidence</span>
+        <span>{dict.answers.confidence}</span>
         <span className="font-mono text-foreground">{pct(value)}</span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -68,9 +70,14 @@ function ChartTooltipContent({
 }
 
 function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
+  const dict = useI18n();
   const value = answer.noul;
   const interpretation =
-    value >= 0.75 ? "Strong yes" : value <= 0.25 ? "Strong no" : "Uncertain (near 0.5)";
+    value >= 0.75
+      ? dict.answers.strongYes
+      : value <= 0.25
+        ? dict.answers.strongNo
+        : dict.answers.uncertain;
 
   return (
     <Card>
@@ -79,7 +86,7 @@ function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
           <Badge variant="outline">noul</Badge>
           <CardTitle className="font-mono text-base">{id}</CardTitle>
         </div>
-        <CardDescription>Probability the answer is yes. Noul has no separate confidence.</CardDescription>
+        <CardDescription>{dict.answers.noulDescription}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-6">
@@ -98,15 +105,15 @@ function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="font-mono text-2xl font-bold tabular-nums">{value.toFixed(3)}</span>
-              <span className="text-xs text-muted-foreground">P(yes)</span>
+              <span className="text-xs text-muted-foreground">{dict.answers.pYes}</span>
             </div>
           </div>
           <div className="space-y-3">
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>0 — no</span>
-                <span>0.5</span>
-                <span>1 — yes</span>
+                <span>{dict.answers.scaleNo}</span>
+                <span>{dict.answers.scaleMid}</span>
+                <span>{dict.answers.scaleYes}</span>
               </div>
               <div className="relative h-1.5 w-64 overflow-hidden rounded-full bg-muted">
                 <div
@@ -124,6 +131,7 @@ function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
 }
 
 function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
+  const dict = useI18n();
   const data = Object.entries(answer.probabilities).map(([name, probability]) => ({
     name,
     label: name,
@@ -139,7 +147,8 @@ function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
           <CardTitle className="font-mono text-base">{id}</CardTitle>
         </div>
         <CardDescription>
-          Selected: <span className="font-mono font-semibold text-foreground">{answer.choice}</span>
+          {dict.answers.selected}
+          <span className="font-mono font-semibold text-foreground">{answer.choice}</span>
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -167,6 +176,7 @@ function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
 }
 
 function ScoreCard({ id, answer }: { id: string; answer: ScoreAnswer }) {
+  const dict = useI18n();
   const levels = Object.keys(answer.probabilities)
     .map(Number)
     .sort((a, b) => a - b);
@@ -174,7 +184,7 @@ function ScoreCard({ id, answer }: { id: string; answer: ScoreAnswer }) {
 
   const data = levels.map((level) => ({
     name: String(level),
-    label: answer.legend[String(level)] ?? `Level ${level}`,
+    label: answer.legend[String(level)] ?? format(dict.answers.level, { level }),
     probability: answer.probabilities[String(level)] ?? 0,
   }));
 
@@ -186,9 +196,10 @@ function ScoreCard({ id, answer }: { id: string; answer: ScoreAnswer }) {
           <CardTitle className="font-mono text-base">{id}</CardTitle>
         </div>
         <CardDescription>
-          Scored{" "}
-          <span className="font-mono font-semibold text-foreground">{answer.score.toFixed(2)}</span>{" "}
-          on a 0–{maxLevel} scale (can land between levels).
+          {format(dict.answers.scored, {
+            score: answer.score.toFixed(2),
+            max: maxLevel,
+          })}
         </CardDescription>
       </CardHeader>
       <CardContent>

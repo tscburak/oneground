@@ -182,6 +182,47 @@ export function parseState(text: string): JsonStructure | null {
   return trimmed;
 }
 
+export const BULK_MAX_STATES = 50;
+export const BULK_CONCURRENCY = 3;
+
+export type BulkDelimiter = "newline" | "comma" | "semicolon" | "tab" | "jsonl";
+
+const BULK_SEPARATORS: Record<Exclude<BulkDelimiter, "newline" | "jsonl">, string> = {
+  comma: ",",
+  semicolon: ";",
+  tab: "\t",
+};
+
+export function parseBulkStates(text: string, delimiter: BulkDelimiter): JsonStructure[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (delimiter === "jsonl") {
+    return lines.map((line) => {
+      try {
+        return JSON.parse(line) as JsonStructure;
+      } catch {
+        return line;
+      }
+    });
+  }
+  if (delimiter === "newline") {
+    return lines.map((line) => parseState(line) ?? line);
+  }
+  const separator = BULK_SEPARATORS[delimiter];
+  return lines
+    .flatMap((line) => line.split(separator))
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => parseState(part) ?? part);
+}
+
+export function previewState(state: JsonStructure, max = 96): string {
+  const text = typeof state === "string" ? state : JSON.stringify(state);
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
 export function validateDrafts(drafts: QuestionDraft[]): string | null {
   if (drafts.length === 0) return "Add at least one question.";
   const ids = new Set<string>();
