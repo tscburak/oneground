@@ -14,7 +14,7 @@
   "provider": {
     "label": "Sağlayıcı",
     "hosted": "Jev (barındırılan)",
-    "local": "Kev (yerel)"
+    "local": "Yerel uyumlu API"
   },
   "model": {
     "label": "Model",
@@ -28,14 +28,12 @@
   },
   "settings": {
     "title": "Ayarlar",
-    "description": "{provider} için uç nokta ve kimlik bilgileri. Sağlayıcı varsayılanını veya sunucu ortamını kullanmak için boş bırakın.",
+    "description": "TypeSafe uyumlu herhangi bir System One API uç noktasını ayarlayın.",
     "apiUrl": "API URL'si",
-    "apiUrlHint": "/v1 olmadan temel origin. Varsayılan: {url}",
-    "apiUrlHintLocal": " (veya sunucu KEV_BASE_URL)",
+    "apiUrlHint": "API temel URL'sini, /v1 URL'sini veya tam /v1/systemone uç noktasını girin. Varsayılan: {url}",
     "apiKey": "API anahtarı",
-    "apiKeyHint": "Bu uygulamanın sunucusu tarafından Bearer token olarak gönderilir. Boş bırakıldığında TYPESAFE_API_KEY'e düşer.",
-    "apiKeyPlaceholderHosted": "sk-… (veya sunucu TYPESAFE_API_KEY)",
-    "apiKeyPlaceholderLocal": "kev için gerekli değil",
+    "apiKeyHint": "Bearer token olarak gönderilir. Boş bırakıldığında barındırılan istekler TYPESAFE_API_KEY kullanır; yerel isteklere anahtar gönderilmez.",
+    "apiKeyPlaceholder": "İsteğe bağlı",
     "showKey": "API anahtarını göster",
     "hideKey": "API anahtarını gizle"
   },
@@ -140,5 +138,5 @@
     "level": "Düzey {level}",
     "scored": "{score} puanı, 0–{max} ölçeğinde (düzeyler arası düşebilir)."
   },
-  "footer": "İstekler bu uygulamanın sunucu rotası üzerinden yürütülür. Yukarıda ayarlanan API URL'si ve anahtar önceliklidir; aksi halde TYPESAFE_API_KEY (barındırılan) ve KEV_BASE_URL (yerel, varsayılan http://127.0.0.1:8008) sunucu ortamından gelir. Her iki sağlayıcı da aynı /v1/systemone sözleşmesini konuşur."
+  "footer": "İstekler bu uygulamanın sunucu rotası üzerinden yukarıdaki API URL'sine iletilir. Uç noktanın model adını girin; /v1/systemone sunan TypeSafe uyumlu her API kullanılabilir."
 }

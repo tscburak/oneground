@@ -14,7 +14,7 @@
   "provider": {
     "label": "Provider",
     "hosted": "Jev (hosted)",
-    "local": "Kev (local)"
+    "local": "Local compatible API"
   },
   "model": {
     "label": "Model",
@@ -28,14 +28,12 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Endpoint and credentials for {provider}. Leave empty to use the provider default or server environment.",
+    "description": "Configure any TypeSafe-compatible System One endpoint.",
     "apiUrl": "API URL",
-    "apiUrlHint": "Base origin without /v1. Default: {url}",
-    "apiUrlHintLocal": " (or server KEV_BASE_URL)",
+    "apiUrlHint": "Enter the API base URL, /v1 URL, or full /v1/systemone endpoint. Default: {url}",
     "apiKey": "API key",
-    "apiKeyHint": "Sent as a Bearer token by this app's server. Falls back to TYPESAFE_API_KEY when empty.",
-    "apiKeyPlaceholderHosted": "sk-… (or server TYPESAFE_API_KEY)",
-    "apiKeyPlaceholderLocal": "not required for kev",
+    "apiKeyHint": "Sent as a Bearer token. When empty, hosted requests use TYPESAFE_API_KEY; local requests send no key.",
+    "apiKeyPlaceholder": "Optional",
     "showKey": "Show API key",
     "hideKey": "Hide API key"
   },
@@ -140,5 +138,5 @@
     "level": "Level {level}",
     "scored": "Scored {score} on a 0–{max} scale (can land between levels)."
   },
-  "footer": "Requests proxy through this app's server route. API URL and key set above take precedence; otherwise TYPESAFE_API_KEY (hosted) and KEV_BASE_URL (local, default http://127.0.0.1:8008) come from the server environment. Both providers speak the same /v1/systemone contract."
+  "footer": "Requests proxy through this app's server route to the API URL above. Enter the endpoint's model name; any TypeSafe-compatible API exposing /v1/systemone can be used."
 }
