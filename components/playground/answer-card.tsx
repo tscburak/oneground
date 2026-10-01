@@ -138,6 +138,7 @@ function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
     probability,
     chosen: name === answer.choice,
   }));
+  const chartHeight = Math.max(72, data.length * 36);
 
   return (
     <Card>
@@ -152,13 +153,27 @@ function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 h-10">
+        <div className="mb-4 w-full" style={{ height: chartHeight }}>
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} layout="vertical" margin={{ top: 0, right: 24, bottom: 0, left: 0 }}>
+            <BarChart
+              data={data}
+              layout="vertical"
+              barCategoryGap={16}
+              margin={{ top: 4, right: 56, bottom: 4, left: 0 }}
+            >
               <XAxis type="number" domain={[0, 1]} hide />
               <YAxis type="category" dataKey="name" hide />
               <Tooltip content={<ChartTooltipContent />} cursor={{ fill: "var(--muted)" }} />
-              <Bar dataKey="probability" radius={4} barSize={12} label={{ position: "right", formatter: (v) => pct(Number(v)), className: "fill-muted-foreground text-xs" }}>
+              <Bar
+                dataKey="probability"
+                radius={6}
+                barSize={14}
+                label={{
+                  position: "right",
+                  formatter: (value) => pct(Number(value)),
+                  className: "fill-muted-foreground text-xs",
+                }}
+              >
                 {data.map((entry) => (
                   <Cell
                     key={entry.name}
