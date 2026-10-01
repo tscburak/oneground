@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 
 type EvaluateBody = {
-  provider?: string;
   model?: string;
   baseUrl?: string;
   apiKey?: string;
@@ -10,7 +9,6 @@ type EvaluateBody = {
 };
 
 const HOSTED_BASE_URL = "https://api.typesafe.ai";
-const LOCAL_BASE_URL = process.env.KEV_BASE_URL?.trim() || "http://127.0.0.1:8008";
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
@@ -36,8 +34,7 @@ export async function POST(request: NextRequest) {
     return json({ error: "Invalid JSON body." }, 400);
   }
 
-  const provider = body.provider === "local" ? "local" : "hosted";
-  const model = body.model?.trim() || (provider === "local" ? "kev-latest" : "jev-latest");
+  const model = body.model?.trim() || "jev-latest";
 
   if (body.state === undefined || body.state === null) {
     return json({ error: "Field 'state' is required." }, 400);
@@ -52,18 +49,26 @@ export async function POST(request: NextRequest) {
     return json({ error: "Field 'questions' must be a non-empty object map." }, 400);
   }
 
-  const defaultBaseUrl = provider === "local" ? LOCAL_BASE_URL : HOSTED_BASE_URL;
   const customBaseUrl = parseBaseUrl(body.baseUrl);
   if (body.baseUrl?.trim() && !customBaseUrl) {
     return json({ error: "Field 'baseUrl' must be a valid http(s) URL." }, 400);
   }
-  const baseUrl = (customBaseUrl ?? defaultBaseUrl).replace(/\/+$/, "");
+  const baseUrl = (customBaseUrl ?? HOSTED_BASE_URL).replace(/\/+$/, "");
+  const baseUrlObject = new URL(baseUrl);
+  const hostedBaseUrlObject = new URL(HOSTED_BASE_URL);
+  const provider = baseUrlObject.origin === hostedBaseUrlObject.origin ? "hosted" : "local";
+  const endpointUrl = new URL(baseUrl);
+  const endpointPath = endpointUrl.pathname.replace(/\/+$/, "");
+  if (!endpointPath.endsWith("/v1/systemone")) {
+    endpointUrl.pathname = `${endpointPath}${endpointPath.endsWith("/v1") ? "/systemone" : "/v1/systemone"}`;
+  }
+  const systemOneUrl = endpointUrl.toString().replace(/\/$/, "");
   const headers: Record<string, string> = { "content-type": "application/json" };
 
-  const apiKey = body.apiKey?.trim() || process.env.TYPESAFE_API_KEY;
+  const apiKey = body.apiKey?.trim() || (provider === "hosted" ? process.env.TYPESAFE_API_KEY : undefined);
   if (apiKey) {
     headers.authorization = `Bearer ${apiKey}`;
-  } else if (provider === "hosted" && customBaseUrl === null) {
+  } else if (provider === "hosted") {
     return json(
       { error: "No API key. Set one in the UI or set TYPESAFE_API_KEY on the server." },
       500
@@ -75,16 +80,15 @@ export async function POST(request: NextRequest) {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${baseUrl}/v1/systemone`, {
+    upstream = await fetch(systemOneUrl, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
     });
   } catch (error) {
-    const message =
-      provider === "local"
-        ? `Could not reach the local System One server at ${baseUrl}. Is kev running?`
-        : `Could not reach ${baseUrl}.`;
+    const message = provider === "hosted"
+      ? `Could not reach ${baseUrl}.`
+      : `Could not reach the local System One server at ${baseUrl}. Is it running?`;
     return json({ error: message, cause: String(error) }, 502);
   }
 

@@ -65,16 +65,6 @@ export type EvaluateResponse = SystemOneResponse & {
 
 export type Provider = "hosted" | "local";
 
-export const PROVIDER_DEFAULT_MODEL: Record<Provider, string> = {
-  hosted: "jev-latest",
-  local: "kev-latest",
-};
-
-export const PROVIDER_MODELS: Record<Provider, string[]> = {
-  hosted: ["jev-latest", "jev-preview", "jev-1.13.0"],
-  local: ["kev-latest"],
-};
-
 export type QuestionDraft =
   | {
       id: string;

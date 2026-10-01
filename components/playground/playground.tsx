@@ -52,24 +52,16 @@ import {
   parseBulkStates,
   parseState,
   previewState,
-  PROVIDER_DEFAULT_MODEL,
-  PROVIDER_MODELS,
   validateDrafts,
   type Answer,
   type BulkDelimiter,
   type EvaluateResponse,
   type JsonStructure,
-  type Provider,
   type QuestionDraft,
   type QuestionsMap,
 } from "@/lib/typesafe";
 
-const CUSTOM_MODEL = "__custom__";
-
-const PROVIDER_BASE_URL: Record<Provider, string> = {
-  hosted: "https://api.typesafe.ai",
-  local: "http://127.0.0.1:8008",
-};
+const DEFAULT_API_URL = "https://api.typesafe.ai";
 
 type RunResult = {
   response: EvaluateResponse;
@@ -242,10 +234,8 @@ function BulkAnswers({ bulkResult, running }: { bulkResult: BulkRunResult; runni
 export function Playground() {
   const dict = useI18n();
   const [preset, setPreset] = useState<string>("none");
-  const [provider, setProvider] = useState<Provider>("hosted");
-  const [modelChoice, setModelChoice] = useState<string>(PROVIDER_DEFAULT_MODEL.hosted);
-  const [customModel, setCustomModel] = useState<string>("");
-  const [baseUrl, setBaseUrl] = useState<string>(PROVIDER_BASE_URL.hosted);
+  const [model, setModel] = useState<string>("jev-latest");
+  const [baseUrl, setBaseUrl] = useState<string>(DEFAULT_API_URL);
   const [apiKey, setApiKey] = useState<string>("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [stateMode, setStateMode] = useState<StateMode>("single");
@@ -259,15 +249,6 @@ export function Playground() {
 
   const parsedState = useMemo(() => parseState(stateText), [stateText]);
   const bulkStates = useMemo(() => parseBulkStates(bulkText, delimiter), [bulkText, delimiter]);
-  const model = modelChoice === CUSTOM_MODEL ? customModel.trim() : modelChoice;
-
-  function applyProvider(next: Provider) {
-    setProvider(next);
-    setModelChoice(PROVIDER_DEFAULT_MODEL[next]);
-    setCustomModel("");
-    setBaseUrl(PROVIDER_BASE_URL[next]);
-  }
-
   function applyPreset(name: string) {
     setPreset(name);
     if (name === "none") {
@@ -321,7 +302,6 @@ export function Playground() {
         state,
         model,
         questions,
-        provider,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
       }),
@@ -445,8 +425,6 @@ export function Playground() {
     }
   }
 
-  const modelOptions = PROVIDER_MODELS[provider];
-
   return (
     <div className="mx-auto w-full max-w-7xl px-6 py-8">
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
@@ -469,42 +447,13 @@ export function Playground() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={provider} onValueChange={(v) => applyProvider(v as Provider)}>
-            <SelectTrigger className="h-9 w-36" aria-label={dict.provider.label}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hosted">{dict.provider.hosted}</SelectItem>
-              <SelectItem value="local">{dict.provider.local}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={modelChoice}
-            onValueChange={(v) => {
-              setModelChoice(v);
-              if (v !== CUSTOM_MODEL) setCustomModel("");
-            }}
-          >
-            <SelectTrigger className="h-9 w-44" aria-label={dict.model.label}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {modelOptions.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-              <SelectItem value={CUSTOM_MODEL}>{dict.model.custom}</SelectItem>
-            </SelectContent>
-          </Select>
-          {modelChoice === CUSTOM_MODEL && (
-            <Input
-              value={customModel}
-              onChange={(e) => setCustomModel(e.target.value)}
-              placeholder={dict.model.placeholder}
-              className="h-9 w-36 font-mono text-xs"
-            />
-          )}
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder={dict.model.placeholder}
+            className="h-9 w-44 font-mono text-xs"
+            aria-label={dict.model.label}
+          />
           <Button onClick={run} disabled={running} className="h-9">
             {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
             {dict.actions.run}
@@ -518,12 +467,7 @@ export function Playground() {
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>{dict.settings.title}</DialogTitle>
-                <DialogDescription>
-                  {format(dict.settings.description, {
-                    provider:
-                      provider === "hosted" ? dict.provider.hosted : dict.provider.local,
-                  })}
-                </DialogDescription>
+                <DialogDescription>{dict.settings.description}</DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -532,12 +476,11 @@ export function Playground() {
                     id="api-url"
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={PROVIDER_BASE_URL[provider]}
+                    placeholder={DEFAULT_API_URL}
                     className="h-9 font-mono text-xs"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {format(dict.settings.apiUrlHint, { url: PROVIDER_BASE_URL[provider] })}
-                    {provider === "local" && dict.settings.apiUrlHintLocal}.
+                    {format(dict.settings.apiUrlHint, { url: DEFAULT_API_URL })}
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -548,11 +491,7 @@ export function Playground() {
                       type={showApiKey ? "text" : "password"}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={
-                        provider === "hosted"
-                          ? dict.settings.apiKeyPlaceholderHosted
-                          : dict.settings.apiKeyPlaceholderLocal
-                      }
+                      placeholder={dict.settings.apiKeyPlaceholder}
                       className="h-9 pr-10 font-mono text-xs"
                       autoComplete="off"
                     />
