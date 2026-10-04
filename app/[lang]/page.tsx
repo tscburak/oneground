@@ -1,5 +1,10 @@
-import { Playground } from "@/components/playground/playground";
+import { Workspace } from "@/components/lab/workspace";
+import { ModelSettingsProvider } from "@/components/model-settings-provider";
 
 export default function Home() {
-  return <Playground />;
+  return (
+    <ModelSettingsProvider>
+      <Workspace />
+    </ModelSettingsProvider>
+  );
 }
