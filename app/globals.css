@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "driver.js/dist/driver.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -126,5 +127,47 @@
   }
   html {
     @apply font-sans;
+    scrollbar-gutter: stable;
   }
 }
+
+/* The root gutter already reserves the scrollbar width, including during
+   Radix scroll locks. Do not reserve that same space again on the body. */
+@supports (scrollbar-gutter: stable) {
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
+    --removed-body-scroll-bar-size: 0px !important;
+  }
+}
+
+.workspace-panel {
+  width: 100%;
+  min-width: 0;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 2rem 1rem;
+}
+@media (min-width: 768px) {
+  .workspace-panel { padding-inline: 2rem; }
+}
+[data-slot="tabs-content"], .workspace-panel [data-slot="card"] { min-width: 0; }
+.oneground-tour.driver-popover {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-sans), sans-serif;
+  max-width: min(360px, calc(100vw - 24px));
+}
+.oneground-tour .driver-popover-title { font-size: 1rem; }
+.oneground-tour .driver-popover-description { line-height: 1.6; font-size: 0.875rem; }
+.oneground-tour .driver-popover-progress-text { color: var(--muted-foreground); }
+.oneground-tour .driver-popover-footer button {
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.6);
+  text-shadow: none;
+}
+.oneground-tour .driver-popover-footer button:hover { background: var(--accent); }
+.oneground-tour .driver-popover-close-btn { color: var(--muted-foreground); }
