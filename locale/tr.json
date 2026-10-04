@@ -32,7 +32,7 @@
     "apiUrl": "API URL'si",
     "apiUrlHint": "API temel URL'sini, /v1 URL'sini veya tam /v1/systemone uç noktasını girin. Varsayılan: {url}",
     "apiKey": "API anahtarı",
-    "apiKeyHint": "Bearer token olarak gönderilir. Boş bırakıldığında barındırılan istekler TYPESAFE_API_KEY kullanır; yerel isteklere anahtar gönderilmez.",
+    "apiKeyHint": "Veritabanında şifreli saklanır. Boş bırakmak kayıtlı anahtarı korur; kaldırmak için Anahtarı sil’i kullanın.",
     "apiKeyPlaceholder": "İsteğe bağlı",
     "showKey": "API anahtarını göster",
     "hideKey": "API anahtarını gizle"

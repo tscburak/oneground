@@ -32,7 +32,7 @@
     "apiUrl": "API URL",
     "apiUrlHint": "Enter the API base URL, /v1 URL, or full /v1/systemone endpoint. Default: {url}",
     "apiKey": "API key",
-    "apiKeyHint": "Sent as a Bearer token. When empty, hosted requests use TYPESAFE_API_KEY; local requests send no key.",
+    "apiKeyHint": "Stored encrypted in the database. Leave blank to keep the saved key; use Clear key to remove it.",
     "apiKeyPlaceholder": "Optional",
     "showKey": "Show API key",
     "hideKey": "Hide API key"

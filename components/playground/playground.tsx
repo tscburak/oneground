@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Eye, EyeOff, Loader2, Play, Plus, Settings } from "lucide-react";
+import { Loader2, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { format, useI18n } from "@/components/i18n";
-import { LocaleSwitcher } from "@/components/locale-switcher";
+import { useModelSettings } from "@/components/model-settings-provider";
+import { ModelSettingsDialog } from "@/components/model-settings-dialog";
 import { AnswerCard } from "@/components/playground/answer-card";
 import { QuestionEditor } from "@/components/playground/question-editor";
 import { Badge } from "@/components/ui/badge";
@@ -17,21 +18,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -61,8 +52,6 @@ import {
   type QuestionsMap,
 } from "@/lib/typesafe";
 
-const DEFAULT_API_URL = "https://api.typesafe.ai";
-
 type RunResult = {
   response: EvaluateResponse;
   request: { state: JsonStructure; model: string; questions: QuestionsMap };
@@ -85,7 +74,9 @@ type BulkRunResult = {
 
 type StateMode = "single" | "bulk";
 
-function stateKind(state: JsonStructure): "kindText" | "kindArray" | "kindObject" {
+function stateKind(
+  state: JsonStructure,
+): "kindText" | "kindArray" | "kindObject" {
   if (typeof state === "string") return "kindText";
   if (Array.isArray(state)) return "kindArray";
   return "kindObject";
@@ -120,22 +111,39 @@ function BulkAnswerCell({ answer }: { answer: Answer | undefined }) {
       </span>
     );
   }
-  return <span className="font-mono text-xs tabular-nums">{answer.score.toFixed(2)}</span>;
+  return (
+    <span className="font-mono text-xs tabular-nums">
+      {answer.score.toFixed(2)}
+    </span>
+  );
 }
 
-function BulkAnswers({ bulkResult, running }: { bulkResult: BulkRunResult; running: boolean }) {
+function BulkAnswers({
+  bulkResult,
+  running,
+}: {
+  bulkResult: BulkRunResult;
+  running: boolean;
+}) {
   const dict = useI18n();
   const { results, answerOrder, model } = bulkResult;
-  const done = results.filter((r) => r.status === "done" || r.status === "error").length;
+  const done = results.filter(
+    (r) => r.status === "done" || r.status === "error",
+  ).length;
   const ok = results.filter((r) => r.status === "done");
   const failed = results.filter((r) => r.status === "error").length;
   const avgLatency = ok.length
-    ? Math.round(ok.reduce((sum, r) => sum + (r.response?.latencyMs ?? 0), 0) / ok.length)
+    ? Math.round(
+        ok.reduce((sum, r) => sum + (r.response?.latencyMs ?? 0), 0) /
+          ok.length,
+      )
     : 0;
   const tokens = ok.reduce(
     (sum, r) =>
-      sum + (r.response?.usage?.input_tokens ?? 0) + (r.response?.usage?.output_tokens ?? 0),
-    0
+      sum +
+      (r.response?.usage?.input_tokens ?? 0) +
+      (r.response?.usage?.output_tokens ?? 0),
+    0,
   );
 
   return (
@@ -154,7 +162,9 @@ function BulkAnswers({ bulkResult, running }: { bulkResult: BulkRunResult; runni
           </div>
           {avgLatency > 0 && (
             <div>
-              <span className="text-muted-foreground">{dict.bulk.avgLatency}</span>
+              <span className="text-muted-foreground">
+                {dict.bulk.avgLatency}
+              </span>
               <span className="font-mono">{avgLatency} ms</span>
             </div>
           )}
@@ -181,7 +191,10 @@ function BulkAnswers({ bulkResult, running }: { bulkResult: BulkRunResult; runni
                 {dict.bulk.stateColumn}
               </th>
               {answerOrder.map((id) => (
-                <th key={id} className="px-3 py-2 text-left font-mono text-xs font-medium">
+                <th
+                  key={id}
+                  className="px-3 py-2 text-left font-mono text-xs font-medium"
+                >
                   {id}
                 </th>
               ))}
@@ -233,13 +246,28 @@ function BulkAnswers({ bulkResult, running }: { bulkResult: BulkRunResult; runni
 
 export function Playground() {
   const dict = useI18n();
+  const { settings, error: settingsError, mutate } = useModelSettings();
+  const profile =
+    settings?.models.find(
+      (profile) =>
+        profile.id === settings.preferences.defaultProfileId &&
+        profile.kind === "system-one",
+    ) ?? settings?.models.find((profile) => profile.kind === "system-one");
+  const model = profile?.model ?? "",
+    baseUrl = profile?.baseUrl ?? "";
+  const stateMode = settings?.preferences.stateMode ?? "single",
+    delimiter = settings?.preferences.delimiter ?? "newline";
+  function setStateMode(value: StateMode) {
+    void mutate({ action: "preferences", stateMode: value }).catch((error) =>
+      toast.error(error.message),
+    );
+  }
+  function setDelimiter(value: BulkDelimiter) {
+    void mutate({ action: "preferences", delimiter: value }).catch((error) =>
+      toast.error(error.message),
+    );
+  }
   const [preset, setPreset] = useState<string>("none");
-  const [model, setModel] = useState<string>("jev-latest");
-  const [baseUrl, setBaseUrl] = useState<string>(DEFAULT_API_URL);
-  const [apiKey, setApiKey] = useState<string>("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [stateMode, setStateMode] = useState<StateMode>("single");
-  const [delimiter, setDelimiter] = useState<BulkDelimiter>("newline");
   const [stateText, setStateText] = useState<string>("");
   const [bulkText, setBulkText] = useState<string>("");
   const [drafts, setDrafts] = useState<QuestionDraft[]>([]);
@@ -248,7 +276,10 @@ export function Playground() {
   const [bulkResult, setBulkResult] = useState<BulkRunResult | null>(null);
 
   const parsedState = useMemo(() => parseState(stateText), [stateText]);
-  const bulkStates = useMemo(() => parseBulkStates(bulkText, delimiter), [bulkText, delimiter]);
+  const bulkStates = useMemo(
+    () => parseBulkStates(bulkText, delimiter),
+    [bulkText, delimiter],
+  );
   function applyPreset(name: string) {
     setPreset(name);
     if (name === "none") {
@@ -271,7 +302,10 @@ export function Playground() {
     setDrafts((prev) => {
       const id = nextQuestionId(prev);
       if (kind === "noul") {
-        return [...prev, { id, kind, instructions: "", trueCriteria: "", falseCriteria: "" }];
+        return [
+          ...prev,
+          { id, kind, instructions: "", trueCriteria: "", falseCriteria: "" },
+        ];
       }
       if (kind === "choice") {
         return [
@@ -293,23 +327,21 @@ export function Playground() {
 
   async function evaluateOne(
     state: JsonStructure,
-    questions: QuestionsMap
+    questions: QuestionsMap,
   ): Promise<EvaluateResponse> {
     const res = await fetch("/api/evaluate", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         state,
-        model,
+        profileId: profile?.id,
         questions,
-        baseUrl: baseUrl.trim(),
-        apiKey: apiKey.trim(),
       }),
     });
     const data = await res.json();
     if (!res.ok) {
       const error = new Error(
-        data.error ?? format(dict.toasts.requestFailed, { status: res.status })
+        data.error ?? format(dict.toasts.requestFailed, { status: res.status }),
       ) as Error & { upstream?: unknown };
       if (data.upstream) error.upstream = data.upstream;
       throw error;
@@ -337,9 +369,11 @@ export function Playground() {
         prev
           ? {
               ...prev,
-              results: prev.results.map((r, i) => (i === index ? { ...r, ...patch } : r)),
+              results: prev.results.map((r, i) =>
+                i === index ? { ...r, ...patch } : r,
+              ),
             }
-          : prev
+          : prev,
       );
     };
     const worker = async () => {
@@ -360,7 +394,12 @@ export function Playground() {
     };
     setRunning(true);
     try {
-      await Promise.all(Array.from({ length: Math.min(BULK_CONCURRENCY, states.length) }, worker));
+      await Promise.all(
+        Array.from(
+          { length: Math.min(BULK_CONCURRENCY, states.length) },
+          worker,
+        ),
+      );
     } finally {
       setRunning(false);
     }
@@ -395,7 +434,12 @@ export function Playground() {
         return;
       }
       if (bulkStates.length > BULK_MAX_STATES) {
-        toast.error(format(dict.bulk.limit, { max: BULK_MAX_STATES, count: bulkStates.length }));
+        toast.error(
+          format(dict.bulk.limit, {
+            max: BULK_MAX_STATES,
+            count: bulkStates.length,
+          }),
+        );
         return;
       }
       await runBulk(questions);
@@ -426,16 +470,28 @@ export function Playground() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-6 py-8">
+    <div className="workspace-panel">
+      {settingsError && (
+        <p role="alert" className="mb-4 text-sm text-red-600">
+          {settingsError}
+        </p>
+      )}
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{dict.header.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{dict.header.subtitle}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {dict.header.title}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {dict.header.subtitle}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <LocaleSwitcher />
           <Select value={preset} onValueChange={applyPreset}>
-            <SelectTrigger className="h-9 w-44" aria-label={dict.preset.label}>
+            <SelectTrigger
+              data-tour="playground-preset"
+              className="h-9 w-44"
+              aria-label={dict.preset.label}
+            >
               <SelectValue placeholder={dict.preset.label} />
             </SelectTrigger>
             <SelectContent>
@@ -447,76 +503,50 @@ export function Playground() {
               ))}
             </SelectContent>
           </Select>
-          <Input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={dict.model.placeholder}
-            className="h-9 w-44 font-mono text-xs"
+          <select
+            data-tour="playground-model"
+            value={profile?.id ?? ""}
+            disabled={!settings || running}
             aria-label={dict.model.label}
-          />
-          <Button onClick={run} disabled={running} className="h-9">
-            {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
+            className="h-9 w-44 rounded-md border bg-background px-2 font-mono text-xs"
+            onChange={(e) => {
+              void mutate({
+                action: "preferences",
+                defaultProfileId: e.target.value,
+              }).catch((error) => toast.error(error.message));
+            }}
+          >
+            <option value="" disabled>
+              {dict.model.placeholder}
+            </option>
+            {settings?.models
+              .filter((profile) => profile.kind === "system-one")
+              .map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {profile.name} · {profile.model}
+                </option>
+              ))}
+          </select>
+          <Button
+            data-tour="playground-run"
+            onClick={run}
+            disabled={running || !profile}
+            className="h-9"
+          >
+            {running ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Play className="size-4" />
+            )}
             {dict.actions.run}
           </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="icon" className="size-9" aria-label={dict.actions.settings}>
-                <Settings className="size-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>{dict.settings.title}</DialogTitle>
-                <DialogDescription>{dict.settings.description}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="api-url">{dict.settings.apiUrl}</Label>
-                  <Input
-                    id="api-url"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={DEFAULT_API_URL}
-                    className="h-9 font-mono text-xs"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {format(dict.settings.apiUrlHint, { url: DEFAULT_API_URL })}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="api-key">{dict.settings.apiKey}</Label>
-                  <div className="relative">
-                    <Input
-                      id="api-key"
-                      type={showApiKey ? "text" : "password"}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder={dict.settings.apiKeyPlaceholder}
-                      className="h-9 pr-10 font-mono text-xs"
-                      autoComplete="off"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey((v) => !v)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label={
-                        showApiKey ? dict.settings.hideKey : dict.settings.showKey
-                      }
-                    >
-                      {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{dict.settings.apiKeyHint}</p>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <ModelSettingsDialog iconOnly />
         </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="space-y-6">
-          <Card>
+          <Card data-tour="playground-state">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -528,7 +558,9 @@ export function Playground() {
                   )}
                   {stateMode === "bulk" && bulkStates.length > 0 && (
                     <Badge variant="outline" className="font-mono text-xs">
-                      {format(dict.bulk.statesCount, { count: bulkStates.length })}
+                      {format(dict.bulk.statesCount, {
+                        count: bulkStates.length,
+                      })}
                     </Badge>
                   )}
                 </div>
@@ -538,13 +570,20 @@ export function Playground() {
                       value={delimiter}
                       onValueChange={(v) => setDelimiter(v as BulkDelimiter)}
                     >
-                      <SelectTrigger className="h-8 w-36 text-xs" aria-label={dict.bulk.delimiter}>
+                      <SelectTrigger
+                        className="h-8 w-36 text-xs"
+                        aria-label={dict.bulk.delimiter}
+                      >
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="newline">{dict.bulk.newline}</SelectItem>
+                        <SelectItem value="newline">
+                          {dict.bulk.newline}
+                        </SelectItem>
                         <SelectItem value="comma">{dict.bulk.comma}</SelectItem>
-                        <SelectItem value="semicolon">{dict.bulk.semicolon}</SelectItem>
+                        <SelectItem value="semicolon">
+                          {dict.bulk.semicolon}
+                        </SelectItem>
                         <SelectItem value="tab">{dict.bulk.tab}</SelectItem>
                         <SelectItem value="jsonl">{dict.bulk.jsonl}</SelectItem>
                       </SelectContent>
@@ -566,7 +605,9 @@ export function Playground() {
                 </div>
               </div>
               <CardDescription>
-                {stateMode === "single" ? dict.state.description : dict.bulk.description}
+                {stateMode === "single"
+                  ? dict.state.description
+                  : dict.bulk.description}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -588,7 +629,7 @@ export function Playground() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="playground-questions">
             <CardHeader>
               <CardTitle>{dict.questions.label}</CardTitle>
               <CardDescription className="mt-1.5">
@@ -596,7 +637,11 @@ export function Playground() {
               </CardDescription>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="mt-1 h-7 text-xs">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-1 h-7 text-xs"
+                  >
                     <Plus className="size-3" /> {dict.questions.add}
                   </Button>
                 </DropdownMenuTrigger>
@@ -605,7 +650,9 @@ export function Playground() {
                     className="flex-col items-start gap-0.5"
                     onSelect={() => addDraft("noul")}
                   >
-                    <span className="font-medium">{dict.questions.noul.label}</span>
+                    <span className="font-medium">
+                      {dict.questions.noul.label}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {dict.questions.noul.description}
                     </span>
@@ -614,7 +661,9 @@ export function Playground() {
                     className="flex-col items-start gap-0.5"
                     onSelect={() => addDraft("choice")}
                   >
-                    <span className="font-medium">{dict.questions.choice.label}</span>
+                    <span className="font-medium">
+                      {dict.questions.choice.label}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {dict.questions.choice.description}
                     </span>
@@ -623,7 +672,9 @@ export function Playground() {
                     className="flex-col items-start gap-0.5"
                     onSelect={() => addDraft("score")}
                   >
-                    <span className="font-medium">{dict.questions.score.label}</span>
+                    <span className="font-medium">
+                      {dict.questions.score.label}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {dict.questions.score.description}
                     </span>
@@ -642,16 +693,20 @@ export function Playground() {
                   key={index}
                   draft={draft}
                   onChange={(next) =>
-                    setDrafts((prev) => prev.map((d, i) => (i === index ? next : d)))
+                    setDrafts((prev) =>
+                      prev.map((d, i) => (i === index ? next : d)),
+                    )
                   }
-                  onRemove={() => setDrafts((prev) => prev.filter((_, i) => i !== index))}
+                  onRemove={() =>
+                    setDrafts((prev) => prev.filter((_, i) => i !== index))
+                  }
                 />
               ))}
             </CardContent>
           </Card>
         </div>
 
-        <div className="min-w-0">
+        <div data-tour="playground-results" className="min-w-0">
           <Tabs defaultValue="answers">
             <TabsList>
               <TabsTrigger value="answers">{dict.tabs.answers}</TabsTrigger>
@@ -664,7 +719,9 @@ export function Playground() {
               ) : stateMode === "bulk" || !result ? (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center gap-2 py-16 text-center">
-                    <p className="text-sm text-muted-foreground">{dict.answers.empty}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {dict.answers.empty}
+                    </p>
                   </CardContent>
                 </Card>
               ) : (
@@ -672,16 +729,26 @@ export function Playground() {
                   <Card>
                     <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 py-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">{dict.answers.model}</span>
-                        <span className="font-mono">{result.response.model}</span>
+                        <span className="text-muted-foreground">
+                          {dict.answers.model}
+                        </span>
+                        <span className="font-mono">
+                          {result.response.model}
+                        </span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">{dict.answers.latency}</span>
-                        <span className="font-mono">{result.response.latencyMs} ms</span>
+                        <span className="text-muted-foreground">
+                          {dict.answers.latency}
+                        </span>
+                        <span className="font-mono">
+                          {result.response.latencyMs} ms
+                        </span>
                       </div>
                       {result.response.usage && (
                         <div>
-                          <span className="text-muted-foreground">{dict.answers.tokens}</span>
+                          <span className="text-muted-foreground">
+                            {dict.answers.tokens}
+                          </span>
                           <span className="font-mono">
                             {format(dict.answers.tokensInOut, {
                               input: result.response.usage.input_tokens ?? 0,
@@ -691,8 +758,12 @@ export function Playground() {
                         </div>
                       )}
                       <div>
-                        <span className="text-muted-foreground">{dict.answers.provider}</span>
-                        <span className="font-mono">{result.response.provider}</span>
+                        <span className="text-muted-foreground">
+                          {dict.answers.provider}
+                        </span>
+                        <span className="font-mono">
+                          {result.response.provider}
+                        </span>
                       </div>
                     </CardContent>
                   </Card>
@@ -716,7 +787,7 @@ export function Playground() {
                             questions: bulkResult.questions,
                           })),
                           null,
-                          2
+                          2,
                         )
                       : result
                         ? JSON.stringify(result.request, null, 2)
@@ -731,9 +802,11 @@ export function Playground() {
                   <pre className="max-h-[70vh] overflow-auto p-4 font-mono text-xs leading-relaxed">
                     {stateMode === "bulk" && bulkResult
                       ? JSON.stringify(
-                          bulkResult.results.map((r) => r.response ?? { error: r.error }),
+                          bulkResult.results.map(
+                            (r) => r.response ?? { error: r.error },
+                          ),
                           null,
-                          2
+                          2,
                         )
                       : result
                         ? JSON.stringify(result.response, null, 2)
@@ -747,7 +820,9 @@ export function Playground() {
       </div>
 
       <Separator className="my-10" />
-      <footer className="pb-8 text-xs text-muted-foreground">{dict.footer}</footer>
+      <footer className="pb-8 text-xs text-muted-foreground">
+        {dict.footer}
+      </footer>
     </div>
   );
 }
