@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Roboto, Geist_Mono } from "next/font/google";
 import { I18nProvider } from "@/components/i18n";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getDictionary, hasLocale } from "@/lib/i18n";
@@ -43,12 +44,15 @@ export default async function RootLayout({
     <html
       lang={lang}
       className={`${roboto.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <I18nProvider dict={dict}>
-          <TooltipProvider>{children}</TooltipProvider>
-          <Toaster position="bottom-right" />
-        </I18nProvider>
+        <ThemeProvider>
+          <I18nProvider dict={dict}>
+            <TooltipProvider>{children}</TooltipProvider>
+            <Toaster position="bottom-right" />
+          </I18nProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
