@@ -19,6 +19,8 @@ export function db() {
     database.pragma("busy_timeout = 5000");
     database.exec(`CREATE TABLE IF NOT EXISTS entities (id TEXT PRIMARY KEY, kind TEXT NOT NULL, created TEXT NOT NULL, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, body TEXT NOT NULL, status TEXT NOT NULL, lease INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS worker_heartbeat (id INTEGER PRIMARY KEY CHECK (id=1), heartbeat INTEGER NOT NULL DEFAULT 0);
+      INSERT OR IGNORE INTO worker_heartbeat (id, heartbeat) VALUES (1, 0);
       CREATE TABLE IF NOT EXISTS items (run_id TEXT NOT NULL, row_id TEXT NOT NULL, evaluator_id TEXT NOT NULL, body TEXT NOT NULL, PRIMARY KEY(run_id,row_id,evaluator_id));`);
   }
   return database;
@@ -73,6 +75,20 @@ export function getStatus(id: string): Run["status"] {
       status: Run["status"];
     }
   ).status;
+}
+export function setWorkerHeartbeat(heartbeat: number) {
+  db()
+    .prepare("UPDATE worker_heartbeat SET heartbeat=? WHERE id=1")
+    .run(heartbeat);
+}
+export function getWorkerStatus() {
+  const { heartbeat } = db()
+    .prepare("SELECT heartbeat FROM worker_heartbeat WHERE id=1")
+    .get() as { heartbeat: number };
+  return {
+    online: heartbeat > Date.now() - 20_000,
+    lastSeenAt: heartbeat ? new Date(heartbeat).toISOString() : null,
+  };
 }
 export function listRuns(): RunSummary[] {
   const rows = db()

@@ -9,8 +9,10 @@ import {
   db,
   getRun,
   getStatus,
+  getWorkerStatus,
   listRuns,
   saveItem,
+  setWorkerHeartbeat,
   setStatus,
 } from "../lib/lab/store";
 import { DEFAULT_POLICY, type Run } from "../lib/lab/types";
@@ -24,6 +26,10 @@ after(() => {
   rmdirSync(directory);
 });
 test("SQLite preserves snapshots, checkpoints, leases and cancellation across claims", () => {
+  assert.equal(getWorkerStatus().online, false);
+  setWorkerHeartbeat(Date.now());
+  assert.equal(getWorkerStatus().online, true);
+  setWorkerHeartbeat(0);
   const run: Run = {
     id: "run",
     name: "test",
