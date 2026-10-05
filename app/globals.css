@@ -131,6 +131,16 @@
   }
 }
 
+.theme-logo-dark {
+  display: none;
+}
+.dark .theme-logo-light {
+  display: none;
+}
+.dark .theme-logo-dark {
+  display: block;
+}
+
 /* The root gutter already reserves the scrollbar width, including during
    Radix scroll locks. Do not reserve that same space again on the body. */
 @supports (scrollbar-gutter: stable) {
