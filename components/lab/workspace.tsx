@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import darkLogo from "../../public/darklogo.png";
+import lightLogo from "../../public/lightlogo.png";
 import { useParams } from "next/navigation";
 import {
   Bar,
@@ -481,25 +483,15 @@ export function Workspace() {
         <div className="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
           <div>
             <Image
-              src="/lightlogo.png"
+              src={lightLogo}
               alt="OneGround"
-              width={2172}
-              height={724}
-              className="theme-logo-light h-8 w-auto"
+              className="theme-logo-light h-12 w-auto"
             />
             <Image
-              src="/darklogo.png"
+              src={darkLogo}
               alt="OneGround"
-              width={2172}
-              height={724}
-              className="theme-logo-dark h-8 w-auto"
+              className="theme-logo-dark h-12 w-auto"
             />
-            <p className="text-xs text-muted-foreground">
-              {t(
-                "Karar değerlendirme çalışma alanı",
-                "Decision evaluation workspace",
-              )}
-            </p>
           </div>
           <TabsList>
             <TabsTrigger value="playground">Playground</TabsTrigger>
