@@ -47,6 +47,9 @@ export function parseDataset(
 
 export function field(record: unknown, path: string): unknown {
   if (!path) return record;
+  // CSV headers may contain dots; prefer a literal key before nested lookup.
+  if (record && typeof record === "object" && Object.hasOwn(record, path))
+    return (record as Record<string, unknown>)[path];
   return path
     .split(".")
     .reduce<unknown>(

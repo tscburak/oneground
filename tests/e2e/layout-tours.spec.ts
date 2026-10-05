@@ -83,6 +83,14 @@ for (const width of [1440, 390]) {
       await page.keyboard.press("Escape");
       await expect(page.locator(".driver-popover")).toHaveCount(0);
     }
+    await page.getByRole("tab", { name: "Model vs", exact: true }).click();
+    expect(await dimensions()).toEqual(original);
+    await page.getByRole("button", { name: "Tutorial", exact: true }).click();
+    await expect(page.locator(".driver-popover-title")).toHaveText(
+      "Compare on one input",
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".driver-popover")).toHaveCount(0);
     await playground.click();
     expect(await dimensions()).toEqual(original);
     expect(mutations).toEqual([]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import {
   Bar,
@@ -22,6 +23,8 @@ import { QuestionEditor } from "@/components/playground/question-editor";
 import { Playground } from "@/components/playground/playground";
 import { AdvancedAnalysis } from "./advanced-analysis";
 import { SchemaPreview } from "./schema-preview";
+import { DatasetMapping } from "./dataset-mapping";
+import { ModelVsWorkspace } from "./model-vs-workspace";
 import { GuidedTour, type TourSection } from "@/components/guided-tour";
 import { ModelSettingsDialog } from "@/components/model-settings-dialog";
 import { useModelSettings } from "@/components/model-settings-provider";
@@ -133,6 +136,16 @@ function Panel({
     </Card>
   );
 }
+function fieldPaths(value: unknown, prefix = ""): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return prefix ? [prefix] : [];
+  return Object.entries(value).flatMap(([key, child]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    return child && typeof child === "object" && !Array.isArray(child)
+      ? [path, ...fieldPaths(child, path)]
+      : [path];
+  });
+}
 const percent = (value: number | null) =>
   value === null ? "—" : `${(value * 100).toFixed(1)}%`;
 const initialDraft: QuestionDraft = {
@@ -234,32 +247,51 @@ export function Workspace() {
     useModelSettings();
   const [area, setArea] = useState("playground");
   const [labSection, setLabSection] = useState<TourSection>("dataset");
-  const tourSection = area === "playground" ? "playground" : labSection;
+  const tourSection =
+    area === "playground"
+      ? "playground"
+      : area === "model-vs"
+        ? "compare"
+        : labSection;
   const t = (turkish: string, english: string) => (tr ? turkish : english);
   const [datasets, setDatasets] = useState<Dataset[]>([]),
     [schemas, setSchemas] = useState<Schema[]>([]),
     [runs, setRuns] = useState<RunSummary[]>([]);
+  const [workerStatus, setWorkerStatus] = useState<{
+    online: boolean;
+    lastSeenAt: string | null;
+  } | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [datasetId, setDatasetId] = useState(""),
     [schemaId, setSchemaId] = useState(""),
     [runId, setRunId] = useState(""),
     [run, setRun] = useState<Run | null>(null);
+  const [datasetStep, setDatasetStep] = useState<"import" | "mapping">(
+    "import",
+  );
   const [drafts, setDrafts] = useState<QuestionDraft[]>([initialDraft]),
     [schemaName, setSchemaName] = useState("Urgency v1"),
     [schemaJson, setSchemaJson] = useState("");
   const [text, setText] = useState(demo),
     [format, setFormat] = useState<"json" | "csv" | "jsonl">("json"),
     [datasetName, setDatasetName] = useState("Urgency sample"),
-    [mapping, setMapping] = useState({
+    [mapping, setMapping] = useState<{
+      id: string;
+      state: string;
+      split: string;
+      segment: string;
+      labels: Record<string, string>;
+    }>({
       id: "id",
       state: "state",
       split: "split",
       segment: "segment",
-      labels: '{"urgent":"expected.urgent"}',
+      labels: { urgent: "expected.urgent" },
     });
   const [evaluators, setEvaluators] = useState<Evaluator[]>([]),
     [runName, setRunName] = useState("Experiment 1");
+  const [modelVsCompleted, setModelVsCompleted] = useState(false);
   const [policy, setPolicy] = useState<Policy>(DEFAULT_POLICY),
     [questionId, setQuestionId] = useState("urgent"),
     [evaluatorId, setEvaluatorId] = useState(""),
@@ -277,6 +309,7 @@ export function Workspace() {
     setDatasets(data.datasets);
     setSchemas(data.schemas);
     setRuns(data.runs);
+    setWorkerStatus(data.worker);
   }
   useEffect(() => {
     let alive = true;
@@ -287,6 +320,7 @@ export function Workspace() {
           setDatasets(data.datasets);
           setSchemas(data.schemas);
           setRuns(data.runs);
+          setWorkerStatus(data.worker);
         }
       } catch (e) {
         if (alive) setError(String(e));
@@ -341,25 +375,35 @@ export function Workspace() {
     setSplit("all");
     setSegment("");
   }
-  const preview = useMemo(() => {
+  const source = useMemo(() => {
     try {
       const records = parseDataset(text, format);
-      const labels = JSON.parse(mapping.labels);
-      if (
-        !labels ||
-        typeof labels !== "object" ||
-        Array.isArray(labels) ||
-        Object.values(labels).some((v) => typeof v !== "string")
-      )
-        throw new Error("Label mapping must be an object of field paths.");
-      return { rows: mapRows(records, { ...mapping, labels }), error: "" };
+      return {
+        records,
+        fields: [
+          ...new Set(records.flatMap((record) => fieldPaths(record))),
+        ],
+        error: "",
+      };
+    } catch (e) {
+      return {
+        records: [] as Record<string, unknown>[],
+        fields: [] as string[],
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+  }, [text, format]);
+  const preview = useMemo(() => {
+    try {
+      if (source.error) throw new Error(source.error);
+      return { rows: mapRows(source.records, mapping), error: "" };
     } catch (e) {
       return {
         rows: [] as DatasetRow[],
         error: e instanceof Error ? e.message : String(e),
       };
     }
-  }, [text, format, mapping]);
+  }, [source, mapping]);
   const activeEvaluator = run?.evaluators.some((e) => e.id === evaluatorId)
     ? evaluatorId
     : run?.evaluators[0]?.id;
@@ -402,6 +446,29 @@ export function Workspace() {
           (filter === "disagreement" && disagreement.has(s.row.id))),
     ) ?? [];
   const selectedSchema = schemas.find((s) => s.id === schemaId);
+  const hasSavedDataset = datasets.some((dataset) => dataset.id === datasetId);
+  const hasSavedSchema = schemas.some((schema) => schema.id === schemaId);
+  const labSteps = ["dataset", "schema", "experiment", "results"] as const;
+  const activeStep = Math.max(0, labSteps.indexOf(labSection as (typeof labSteps)[number]));
+  const stepDone = [
+    hasSavedDataset,
+    hasSavedSchema,
+    runs.length > 0,
+    run?.status === "complete",
+  ];
+  const stepDescriptions = tr
+    ? [
+        "Dataset yükle → alanları eşle → sürüm kaydet",
+        "Karar sorularını tanımla ve şema sürümünü kaydet",
+        "Kayıtlı dataset, şema ve motorlarla toplu deney kur",
+        "İlerleme, hatalar ve metrikleri incele",
+      ]
+    : [
+        "Import dataset → map fields → save version",
+        "Define decision questions and save schema version",
+        "Choose saved dataset, schema and evaluators",
+        "Inspect progress, errors and metrics",
+      ];
   const maxPage = Math.max(0, Math.ceil(visible.length / 100) - 1),
     currentPage = Math.min(rowPage, maxPage);
   const updateEvaluator = (id: string, change: Partial<Evaluator>) =>
@@ -413,7 +480,20 @@ export function Workspace() {
       <Tabs value={area} onValueChange={setArea} className="w-full min-w-0">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b px-6 py-4">
           <div>
-            <p className="font-bold tracking-tight">OneGround</p>
+            <Image
+              src="/lightlogo.png"
+              alt="OneGround"
+              width={2172}
+              height={724}
+              className="theme-logo-light h-8 w-auto"
+            />
+            <Image
+              src="/darklogo.png"
+              alt="OneGround"
+              width={2172}
+              height={724}
+              className="theme-logo-dark h-8 w-auto"
+            />
             <p className="text-xs text-muted-foreground">
               {t(
                 "Karar değerlendirme çalışma alanı",
@@ -424,6 +504,9 @@ export function Workspace() {
           <TabsList>
             <TabsTrigger value="playground">Playground</TabsTrigger>
             <TabsTrigger value="lab">Evaluation lab</TabsTrigger>
+            <TabsTrigger value="model-vs" aria-label="Model vs">
+              Model vs{modelVsCompleted ? " ✓" : ""}
+            </TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <ModelSettingsDialog />
@@ -436,6 +519,19 @@ export function Workspace() {
         </div>
         <TabsContent value="playground">
           <Playground />
+        </TabsContent>
+        <TabsContent
+          value="model-vs"
+          forceMount
+          hidden={area !== "model-vs"}
+        >
+          <div className="workspace-panel space-y-4">
+            <ModelVsWorkspace
+              profiles={modelSettings?.models ?? []}
+              tr={tr}
+              onCompleted={() => setModelVsCompleted(true)}
+            />
+          </div>
         </TabsContent>
         <TabsContent value="lab" className="workspace-panel space-y-6">
           <div>
@@ -460,27 +556,105 @@ export function Workspace() {
               {error}
             </div>
           )}
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>{t("Nasıl çalıştırılır?", "How to run")}</CardTitle>
+                <span
+                  role="status"
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    workerStatus === null
+                      ? "bg-muted text-muted-foreground"
+                      : workerStatus.online
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-900"
+                  }`}
+                >
+                  {workerStatus === null
+                    ? t("Worker kontrol ediliyor…", "Checking worker…")
+                    : workerStatus.online
+                      ? t("Worker çevrimiçi", "Worker online")
+                      : t("Worker çevrimdışı", "Worker offline")}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm font-medium">
+                {t("Adım", "Step")} {activeStep + 1}/4 ·{" "}
+                {stepDescriptions[activeStep]}
+              </p>
+              <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                <p>
+                  {t(
+                    "Toplu deneyleri işlemek için uygulamadan ayrı bir terminalde worker çalışmalı:",
+                    "A worker must run in a separate terminal to process queued experiments:",
+                  )}{" "}
+                  <code className="rounded bg-background px-1.5 py-1 font-mono">
+                    npm run worker
+                  </code>
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {workerStatus?.online
+                    ? t(
+                        "Worker veritabanına bağlı; kuyruktaki işler işlenecek.",
+                        "Worker is connected to the database; queued jobs will be processed.",
+                      )
+                    : t(
+                        "Worker çevrimdışıysa deney kuyruğa alınır ama ilerlemez. Worker ve web uygulaması aynı ONEGROUND_DB_PATH değerini kullanmalı.",
+                        "If worker is offline, runs stay queued. Worker and web app must use the same ONEGROUND_DB_PATH.",
+                      )}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {t(
+                    "System One / LLM için Ayarlar’da eşleşen model profili ve API anahtarı gerekir.",
+                    "System One / LLM requires a matching model profile and API key in Settings.",
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
           <Tabs
             value={labSection}
             onValueChange={(value) => setLabSection(value as TourSection)}
           >
-            <TabsList data-tour="lab-tabs" className="h-auto flex-wrap">
-              <TabsTrigger value="dataset">Dataset</TabsTrigger>
-              <TabsTrigger value="schema">
+            <TabsList
+              data-tour="lab-tabs"
+              className="h-auto w-full flex-wrap justify-start gap-1"
+            >
+              <TabsTrigger value="dataset" aria-label="Dataset">
+                <span aria-hidden="true">1</span> Dataset{stepDone[0] ? " ✓" : ""}
+              </TabsTrigger>
+              <TabsTrigger
+                value="schema"
+                aria-label={t("Karar şeması", "Decision schema")}
+              >
+                <span aria-hidden="true">2</span>{" "}
                 {t("Karar şeması", "Decision schema")}
+                {stepDone[1] ? " ✓" : ""}
               </TabsTrigger>
-              <TabsTrigger value="experiment">
+              <TabsTrigger
+                value="experiment"
+                aria-label={t("Deney oluştur", "New experiment")}
+              >
+                <span aria-hidden="true">3</span>{" "}
                 {t("Deney oluştur", "New experiment")}
+                {stepDone[2] ? " ✓" : ""}
               </TabsTrigger>
-              <TabsTrigger value="results">
+              <TabsTrigger
+                value="results"
+                aria-label={t("Analiz & replay", "Analysis & replay")}
+              >
+                <span aria-hidden="true">4</span>{" "}
                 {t("Analiz & replay", "Analysis & replay")}
+                {stepDone[3] ? " ✓" : ""}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="dataset" className="space-y-4 pt-4">
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-4">
+                {datasetStep === "import" && (
                 <Panel
                   tour="dataset-import"
-                  title={t("Dataset yükle", "Import dataset")}
+                  title={t("1. Dataset yükle", "1. Import dataset")}
                 >
                   <Field title={t("Dataset adı", "Dataset name")}>
                     <Input
@@ -524,13 +698,19 @@ export function Workspace() {
                       />
                     </Field>
                   </div>
-                  <Field title={t("Veri / önizleme", "Data / preview")}>
-                    <Textarea
-                      className="min-h-64 font-mono text-xs"
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                    />
-                  </Field>
+                  <details open className="rounded-md border">
+                    <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+                      {t("Veri / önizleme", "Data / preview")}
+                    </summary>
+                    <div className="border-t p-3">
+                      <Textarea
+                        aria-label={t("Veri / önizleme", "Data / preview")}
+                        className="min-h-64 font-mono text-xs"
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                      />
+                    </div>
+                  </details>
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -541,51 +721,42 @@ export function Workspace() {
                         state: "state",
                         split: "split",
                         segment: "segment",
-                        labels: '{"urgent":"expected.urgent"}',
+                        labels: { urgent: "expected.urgent" },
                       });
                     }}
                   >
                     {t("Örnek veriyi yükle", "Load sample")}
                   </Button>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      {t(
+                        "Dosya seçin, veri yapıştırın veya örnekle başlayın. Sonraki adımda alanları eşleyeceksiniz.",
+                        "Choose a file, paste data, or load the sample. Next, you will map its fields.",
+                      )}
+                    </p>
+                    <Button
+                      disabled={busy || !text.trim()}
+                      onClick={() => setDatasetStep("mapping")}
+                    >
+                      {t("Sonraki: Alanları eşle →", "Next: Map fields →")}
+                    </Button>
+                  </div>
                 </Panel>
+                )}
+                {datasetStep === "mapping" && (
                 <Panel
                   tour="dataset-mapping"
-                  title={t("Alan eşleme", "Field mapping")}
+                  title={t("2. Alanları eşle ve önizle", "2. Map fields & preview")}
                 >
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      "İç içe alanlar için noktalı yol kullanın. Boş state yolu tüm kaydı gönderir. Boş split yolu validation kullanır.",
-                      "Use dotted paths for nested fields. Empty state path sends the whole record; empty split defaults to validation.",
-                    )}
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["id", "state", "split", "segment"] as const).map(
-                      (key) => (
-                        <Field key={key} title={key}>
-                          <Input
-                            value={mapping[key]}
-                            onChange={(e) =>
-                              setMapping({ ...mapping, [key]: e.target.value })
-                            }
-                          />
-                        </Field>
-                      ),
-                    )}
-                  </div>
-                  <Field
-                    title={t(
-                      "Etiket eşleme: soru ID → alan yolu (JSON)",
-                      "Labels: question ID → field path (JSON)",
-                    )}
-                  >
-                    <Textarea
-                      className="font-mono text-xs"
-                      value={mapping.labels}
-                      onChange={(e) =>
-                        setMapping({ ...mapping, labels: e.target.value })
-                      }
-                    />
-                  </Field>
+                  <DatasetMapping
+                    records={source.records}
+                    fields={source.fields}
+                    format={format}
+                    mapping={mapping}
+                    onChange={setMapping}
+                    questions={drafts}
+                    tr={tr}
+                  />
                   {preview.error ? (
                     <p
                       role="status"
@@ -615,9 +786,48 @@ export function Workspace() {
                           test
                         </span>
                       </div>
-                      <pre className="max-h-48 overflow-auto rounded bg-muted p-3 text-xs">
-                        {JSON.stringify(preview.rows.slice(0, 3), null, 2)}
-                      </pre>
+                      <details open className="rounded-md border">
+                        <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+                          {t("Önizleme", "Mapped preview")} ·{" "}
+                          {preview.rows.length} {t("kayıt", "rows")}
+                        </summary>
+                        <div className="max-h-72 overflow-auto border-t">
+                          <table className="w-full min-w-[720px] text-xs">
+                            <thead className="sticky top-0 bg-muted">
+                              <tr>
+                                {[
+                                  t("ID", "ID"),
+                                  t("Girdi", "Input"),
+                                  t("Etiketler", "Labels"),
+                                  "Split",
+                                  t("Segment", "Segment"),
+                                ].map((heading) => (
+                                  <th key={heading} className="p-2 text-left">
+                                    {heading}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {preview.rows.slice(0, 10).map((row) => (
+                                <tr key={row.id} className="border-t align-top">
+                                  <td className="p-2">{row.id}</td>
+                                  <td className="max-w-80 whitespace-pre-wrap p-2">
+                                    {typeof row.state === "string"
+                                      ? row.state
+                                      : JSON.stringify(row.state)}
+                                  </td>
+                                  <td className="p-2">
+                                    {JSON.stringify(row.expected)}
+                                  </td>
+                                  <td className="p-2">{row.split}</td>
+                                  <td className="p-2">{row.segment || "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
                     </>
                   )}
                   <Button
@@ -642,8 +852,25 @@ export function Workspace() {
                   >
                     {t("Dataset sürümünü kaydet", "Save dataset version")}
                   </Button>
+                  <div className="flex flex-wrap justify-between gap-2 border-t pt-4">
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => setDatasetStep("import")}
+                    >
+                      {t("← Veriyi değiştir", "← Back to data")}
+                    </Button>
+                    <Button
+                      disabled={busy || !hasSavedDataset}
+                      onClick={() => setLabSection("schema")}
+                    >
+                      {t("Sonraki: Karar şeması →", "Next: Decision schema →")}
+                    </Button>
+                  </div>
                 </Panel>
+                )}
               </div>
+              {datasetStep === "import" && (
               <Panel title={t("Kayıtlı dataset’ler", "Saved datasets")}>
                 <div className="grid gap-3 md:grid-cols-3">
                   {datasets.map((d) => (
@@ -667,7 +894,19 @@ export function Workspace() {
                     {t("Henüz dataset yok.", "No datasets yet.")}
                   </p>
                 )}
+                <Button
+                  className="mt-3"
+                  variant="outline"
+                  disabled={!hasSavedDataset}
+                  onClick={() => setLabSection("schema")}
+                >
+                  {t(
+                    "Dataset seçili: sonraki adım → Karar şeması",
+                    "Use selected dataset → Decision schema",
+                  )}
+                </Button>
               </Panel>
+              )}
             </TabsContent>
             <TabsContent value="schema" className="space-y-4 pt-4">
               <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
@@ -813,6 +1052,20 @@ export function Workspace() {
                     </button>
                   ))}
                 </Panel>
+              </div>
+              <div className="flex flex-wrap justify-between gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setLabSection("dataset")}
+                >
+                  {t("← Dataset’e dön", "← Back to Dataset")}
+                </Button>
+                <Button
+                  disabled={!hasSavedSchema}
+                  onClick={() => setLabSection("experiment")}
+                >
+                  {t("Sonraki: Deney oluştur →", "Next: Configure experiment →")}
+                </Button>
               </div>
             </TabsContent>
             <TabsContent value="experiment" className="space-y-4 pt-4">
@@ -1301,6 +1554,12 @@ export function Workspace() {
                   )}
                 </p>
                 <Button
+                  variant="outline"
+                  onClick={() => setLabSection("schema")}
+                >
+                  {t("← Karar şemasına dön", "← Back to decision schema")}
+                </Button>
+                <Button
                   data-tour="experiment-start"
                   disabled={
                     busy || !datasetId || !schemaId || !evaluators.length
@@ -1316,10 +1575,11 @@ export function Workspace() {
                         policy,
                       });
                       openRun(value);
+                      setLabSection("results");
                       toast.success(
                         t(
-                          "Deney kuyruğa alındı; Analiz sekmesini açın.",
-                          "Experiment queued; open Analysis.",
+                          "Deney kuyruğa alındı; ilerlemeyi Analiz sekmesinden izleyin.",
+                          "Experiment queued; track progress in Analysis.",
                         ),
                       );
                     })
@@ -1327,6 +1587,14 @@ export function Workspace() {
                 >
                   {t("Deneyi başlat", "Start experiment")}
                 </Button>
+                {(!datasetId || !schemaId || !evaluators.length) && (
+                  <p className="text-sm text-muted-foreground">
+                    {t(
+                      "Devam etmek için kayıtlı dataset, şema ve en az bir motor seçin.",
+                      "To continue, select a saved dataset, a saved schema, and at least one evaluator.",
+                    )}
+                  </p>
+                )}
               </Panel>
             </TabsContent>
             <TabsContent value="results" className="space-y-4 pt-4">
@@ -1334,6 +1602,12 @@ export function Workspace() {
                 tour="run-history"
                 title={t("Deney geçmişi", "Experiment history")}
               >
+                <Button
+                  variant="outline"
+                  onClick={() => setLabSection("experiment")}
+                >
+                  {t("← Deneye dön", "← Back to experiment")}
+                </Button>
                 <Select
                   label="Run history"
                   value={runId}
@@ -1365,6 +1639,14 @@ export function Workspace() {
                         }
                         /{run.items.length}
                       </span>
+                      <span>
+                        {run.items.filter((i) => i.status === "running").length}{" "}
+                        {t("çalışıyor", "running")} ·{" "}
+                        {run.items.filter((i) => i.status === "pending").length}{" "}
+                        {t("bekliyor", "pending")} ·{" "}
+                        {run.items.filter((i) => i.status === "error").length}{" "}
+                        {t("hata", "errors")}
+                      </span>
                       {run.parentId && (
                         <button
                           className="underline"
@@ -1378,6 +1660,69 @@ export function Workspace() {
                         </button>
                       )}
                     </div>
+                    {run.status === "queued" && !workerStatus?.online && (
+                      <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                        {t(
+                          "Deney kuyruğa alındı ancak worker çevrimdışı; ilerleme bu yüzden 0’da. Ayrı terminalde npm run worker başlatın. İki süreç aynı veritabanı yolunu kullanmalı.",
+                          "Run is queued but worker is offline, so progress stays at 0. Start npm run worker in a separate terminal. Both processes must share the same database path.",
+                        )}
+                      </p>
+                    )}
+                    {run.status === "queued" && workerStatus?.online && (
+                      <p
+                        role="status"
+                        className="rounded-md border bg-muted/40 p-3 text-sm"
+                      >
+                        {t(
+                          "Worker çevrimiçi; deney sırada. Worker başka bir deneyi bitirince bu deney başlayacak.",
+                          "Worker is online; this run is queued and will start after the current run finishes.",
+                        )}
+                      </p>
+                    )}
+                    {run.status === "running" && workerStatus?.online && (
+                      <p
+                        role="status"
+                        className="rounded-md border bg-muted/40 p-3 text-sm"
+                      >
+                        {t(
+                          "Deney çalışıyor. Model istekleri zaman aşımına kadar 30 saniye sürebilir; ilerleme bu sırada sabit kalabilir.",
+                          "Experiment is running. Model requests can take up to 30 seconds, so progress may pause while a request is in flight.",
+                        )}
+                      </p>
+                    )}
+                    {run.status === "running" && !workerStatus?.online && (
+                      <p
+                        role="status"
+                        className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+                      >
+                        {t(
+                          "Worker bağlantısı kesildi. npm run worker ile yeniden başlatın. Kesilen iş, 60 saniyelik lease süresi dolunca yeniden kuyruğa alınabilir.",
+                          "Worker disconnected. Restart it with npm run worker. Interrupted work becomes claimable again after its 60-second lease expires.",
+                        )}
+                      </p>
+                    )}
+                    {run.status === "complete" && run.items.some((i) => i.status === "error") && (
+                      <p
+                        role="status"
+                        className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950"
+                      >
+                        {t(
+                          "Deney tamamlandı ancak bazı kayıtlar hata verdi. Kayıt incelemede hata ayrıntılarını açıp yapılandırmayı düzeltin, sonra Hataları yeniden dene’yi seçin.",
+                          "Run completed with failed rows. Inspect row errors, fix the configuration, then choose Retry errors.",
+                        )}
+                      </p>
+                    )}
+                    {run.status === "cancelled" && (
+                      <p
+                        role="status"
+                        className="rounded-md border bg-muted/40 p-3 text-sm"
+                      >
+                        {t(
+                          "Deney iptal edildi. Devam et, tamamlanmış kayıtları koruyup bekleyen kayıtları yeniden kuyruğa alır.",
+                          "Run was cancelled. Resume preserves completed rows and requeues unfinished rows.",
+                        )}
+                      </p>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <Button
                         variant="outline"

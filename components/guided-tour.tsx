@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export type TourSection =
-  "playground" | "dataset" | "schema" | "experiment" | "results";
+  | "playground"
+  | "dataset"
+  | "schema"
+  | "experiment"
+  | "results"
+  | "compare";
 type Step = [string, string, string, string, string];
 const steps: Record<TourSection, Step[]> = {
   playground: [
@@ -135,6 +140,29 @@ const steps: Record<TourSection, Step[]> = {
       "Open the results",
       "Analiz & replay sekmesinde ilerlemeyi, hataları ve motorlar arasındaki farkları incele.",
       "Open Analysis & replay to inspect progress, failures and evaluator differences.",
+    ],
+  ],
+  compare: [
+    [
+      "compare-config",
+      "Tek girdide karşılaştır",
+      "Compare on one input",
+      "Tek bir state ve karar sorusu gir. Model karşılaştırması için dataset hazırlaman gerekmez.",
+      "Enter one state and decision question. No dataset setup needed for a model comparison.",
+    ],
+    [
+      "compare-models",
+      "Modelleri seç",
+      "Choose models",
+      "Ayarlar’da kayıtlı profillerden en az iki model seç. Aynı girdiyi eşzamanlı karşılaştırırlar.",
+      "Select at least two saved model profiles. They receive the same input for a side-by-side comparison.",
+    ],
+    [
+      "compare-run",
+      "Karşılaştırmayı çalıştır",
+      "Run the comparison",
+      "Noul, Choice veya Score sorusunu seç. Yanıt, süre, token kullanımı ve varsa tahmini maliyet sonuçlarda görünür.",
+      "Choose Noul, Choice or Score. Results show answers, latency, token usage and estimated cost when available.",
     ],
   ],
   results: [
