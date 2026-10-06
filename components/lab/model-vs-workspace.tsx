@@ -135,10 +135,10 @@ export function ModelVsWorkspace({
     setError("");
     setComparison(null);
     try {
-      const response = await fetch("/api/lab", {
+      const response = await fetch("/api/model-vs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "model-vs", profileIds: selected, state, drafts }),
+        body: JSON.stringify({ profileIds: selected, state, drafts }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Comparison failed.");
@@ -335,7 +335,7 @@ export function ModelVsWorkspace({
                 : t(`Karşılaştır (${selected.length} model)`, `Compare (${selected.length} models)`)}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              {t("API çağrısı yapılır. Dataset veya worker gerekmez.", "Makes API calls. No dataset or worker required.")}
+              {t("Seçilen her model için API çağrısı yapılır.", "Makes one API call per selected model.")}
             </p>
           </CardContent>
         </Card>

@@ -1,6 +1,21 @@
 import type { Evaluator, Judgment, Label, Schema } from "./types";
-import { field } from "./import";
 import { resolveApiKey } from "../model-settings";
+
+function field(record: unknown, path: string): unknown {
+  if (!path) return record;
+  // Keys may contain dots; prefer a literal key before nested lookup.
+  if (record && typeof record === "object" && Object.hasOwn(record, path))
+    return (record as Record<string, unknown>)[path];
+  return path
+    .split(".")
+    .reduce<unknown>(
+      (value, key) =>
+        value && typeof value === "object"
+          ? (value as Record<string, unknown>)[key]
+          : undefined,
+      record,
+    );
+}
 
 export class EvaluationError extends Error {
   constructor(

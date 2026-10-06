@@ -55,7 +55,7 @@ test("settings sections fit desktop and mobile", async ({ page }, testInfo) => {
   await dialog.screenshot({ path: testInfo.outputPath("models-mobile.png") });
 });
 
-test("saved models, keys and preferences survive reload and are shared with Lab", async ({
+test("saved models, keys and preferences survive reload and are shared with Model Compare", async ({
   page,
   request,
 }) => {
@@ -133,23 +133,11 @@ test("saved models, keys and preferences survive reload and are shared with Lab"
       dialog.getByText("API key saved", { exact: true }),
     ).toBeVisible();
     await page.keyboard.press("Escape");
-    await page
-      .getByRole("tab", { name: "Evaluation lab", exact: true })
-      .click();
-    await page
-      .getByRole("tab", { name: "New experiment", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "+ system-one", exact: true })
-      .click();
-    const savedModel = page.getByLabel(/^Saved model /);
-    await savedModel.selectOption(profileId!);
-    await expect(page.getByLabel("Model", { exact: true })).toHaveValue(
-      "persisted-model",
-    );
-    await expect(page.getByLabel("Base URL", { exact: true })).toHaveValue(
-      "http://127.0.0.1:8999",
-    );
+    await page.reload();
+    await page.getByRole("tab", { name: "Model vs", exact: true }).click();
+    const compareModels = page.locator('[data-tour="compare-models"]');
+    await expect(compareModels).toContainText(`${name} renamed`);
+    await expect(compareModels).toContainText("persisted-model");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await dialog.getByRole("tab", { name: "Models", exact: true }).click();
     await dialog

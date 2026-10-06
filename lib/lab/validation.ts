@@ -1,36 +1,7 @@
 import { z } from "zod";
 import { ABSTAIN } from "./types";
+import type { DatasetRow, Run } from "./types";
 const label = z.union([z.string(), z.number().finite(), z.boolean()]);
-const unit = z.number().min(0).max(1);
-export const policyValidator = z.object({
-  threshold: unit,
-  confidence: unit,
-  reviewMargin: z.number().min(0).max(0.5),
-  scoreBoundary: z.number().finite().nullable(),
-});
-export const evaluatorValidator = z.object({
-  profileId: z.string().min(1).optional(),
-  id: z.string().min(1),
-  name: z.string().min(1),
-  kind: z.enum(["rules", "system-one", "llm", "cascade"]),
-  model: z.string(),
-  baseUrl: z.string(),
-  prompt: z.string(),
-  rules: z.array(
-    z.object({
-      question: z.string(),
-      path: z.string(),
-      operator: z.enum(["contains", "equals", "gt", "regex"]),
-      value: z.string().max(500),
-      output: label,
-    }),
-  ),
-  defaults: z.record(z.string(), label),
-  inputPrice: z.number().nonnegative().nullable(),
-  outputPrice: z.number().nonnegative().nullable(),
-  stages: z.array(z.string()).optional(),
-  fallbackConfidence: unit.optional(),
-});
 export const rowValidator = z.object({
   id: z.string().min(1),
   state: z.union([
@@ -74,3 +45,30 @@ export const draftValidator = z.discriminatedUnion("kind", [
     levels: z.array(z.string().min(1)).min(2).max(10),
   }),
 ]);
+export function validateLabels(
+  rows: DatasetRow[],
+  questions: Run["schema"]["questions"],
+) {
+  for (const row of rows)
+    for (const [id, label] of Object.entries(row.expected)) {
+      const q = questions[id];
+      if (!q) throw new Error(`Row ${row.id}: unknown question ${id}.`);
+      if (
+        q.type === "noul" &&
+        label !== true &&
+        label !== false &&
+        label !== "true" &&
+        label !== "false"
+      )
+        throw new Error(`Row ${row.id}: ${id} requires true/false.`);
+      if (q.type === "choice" && !Object.hasOwn(q.criteria, String(label)))
+        throw new Error(`Row ${row.id}: unknown choice ${label}.`);
+      if (
+        q.type === "score" &&
+        (!Number.isFinite(Number(label)) ||
+          Number(label) < 0 ||
+          Number(label) > q.criteria.length - 1)
+      )
+        throw new Error(`Row ${row.id}: invalid score label.`);
+    }
+}

@@ -18,15 +18,3 @@ export type ModelSettings = {
   models: ModelProfile[];
   preferences: Preferences;
 };
-export function evaluatorProfile(profile: ModelProfile) {
-  return {
-    profileId: profile.id,
-    name: profile.name,
-    kind: profile.kind,
-    model: profile.model,
-    baseUrl: profile.baseUrl,
-    prompt: profile.prompt,
-    inputPrice: profile.inputPrice,
-    outputPrice: profile.outputPrice,
-  };
-}

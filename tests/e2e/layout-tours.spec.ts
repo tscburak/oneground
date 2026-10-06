@@ -47,42 +47,6 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByRole("button", { name: "Tutorial", exact: true }),
     ).toBeFocused();
-    await page
-      .getByRole("tab", { name: "Evaluation lab", exact: true })
-      .click();
-    const labTabs = [
-      "Dataset",
-      "Decision schema",
-      "New experiment",
-      "Analysis & replay",
-    ];
-    const firstTitles = [
-      "Import a dataset",
-      "Build questions",
-      "Same data, different evaluators",
-      "Choose an experiment",
-    ];
-    for (const [index, name] of labTabs.entries()) {
-      await page.getByRole("tab", { name, exact: true }).click();
-      const box = await dimensions();
-      expect(Math.abs(box.width - original.width)).toBeLessThan(1);
-      expect(Math.abs(box.left - original.left)).toBeLessThan(1);
-      const overflow = await page.evaluate(
-        () =>
-          document.documentElement.scrollWidth >
-          document.documentElement.clientWidth,
-      );
-      expect(overflow).toBe(false);
-      await page.getByRole("button", { name: "Tutorial", exact: true }).click();
-      await expect(page.locator(".driver-popover-title")).toHaveText(
-        firstTitles[index],
-      );
-      const popover = await page.locator(".driver-popover").boundingBox();
-      expect(popover!.x).toBeGreaterThanOrEqual(0);
-      expect(popover!.x + popover!.width).toBeLessThanOrEqual(width);
-      await page.keyboard.press("Escape");
-      await expect(page.locator(".driver-popover")).toHaveCount(0);
-    }
     await page.getByRole("tab", { name: "Model vs", exact: true }).click();
     expect(await dimensions()).toEqual(original);
     await page.getByRole("button", { name: "Tutorial", exact: true }).click();
