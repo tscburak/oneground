@@ -19,7 +19,18 @@
   "model": {
     "label": "Model",
     "custom": "Özel…",
-    "placeholder": "model kimliği"
+    "placeholder": "model kimliği",
+    "none": "Model seçilmedi",
+    "many": "{count} model",
+    "limit": "En fazla {max} model seçebilirsiniz."
+  },
+  "compare": {
+    "title": "Model karşılaştırması",
+    "status": "Durum",
+    "latency": "Gecikme",
+    "tokens": "Token",
+    "done": "Tamamlandı",
+    "failed": "Başarısız"
   },
   "actions": {
     "run": "Çalıştır",
@@ -58,6 +69,7 @@
     "placeholder": "Satır başına bir durum…",
     "statesCount": "{count} durum",
     "stateColumn": "Durum",
+    "latencyColumn": "Gecikme",
     "empty": "Değerlendirilecek durum yok.",
     "limit": "Toplu mod en fazla {max} duruma izin verir ({count} ayrıştırıldı).",
     "progress": "{done}/{total} durum",
@@ -136,7 +148,9 @@
     "strongNo": "Kuvvetli hayır",
     "uncertain": "Belirsiz (0,5'e yakın)",
     "level": "Düzey {level}",
-    "scored": "{score} puanı, 0–{max} ölçeğinde (düzeyler arası düşebilir)."
+    "scored": "{score} puanı, 0–{max} ölçeğinde (düzeyler arası düşebilir).",
+    "detail": "Detay",
+    "detailTitle": "Yanıt detayı"
   },
   "footer": "İstekler bu uygulamanın sunucu rotası üzerinden yukarıdaki API URL'sine iletilir. Uç noktanın model adını girin; /v1/systemone sunan TypeSafe uyumlu her API kullanılabilir."
 }

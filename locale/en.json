@@ -19,7 +19,18 @@
   "model": {
     "label": "Model",
     "custom": "Custom…",
-    "placeholder": "model id"
+    "placeholder": "model id",
+    "none": "No model selected",
+    "many": "{count} models",
+    "limit": "You can select up to {max} models."
+  },
+  "compare": {
+    "title": "Model comparison",
+    "status": "Status",
+    "latency": "Latency",
+    "tokens": "Tokens",
+    "done": "Done",
+    "failed": "Failed"
   },
   "actions": {
     "run": "Run",
@@ -58,6 +69,7 @@
     "placeholder": "One state per line…",
     "statesCount": "{count} states",
     "stateColumn": "State",
+    "latencyColumn": "Latency",
     "empty": "No states to evaluate.",
     "limit": "Bulk mode allows at most {max} states (parsed {count}).",
     "progress": "{done}/{total} states",
@@ -136,7 +148,9 @@
     "strongNo": "Strong no",
     "uncertain": "Uncertain (near 0.5)",
     "level": "Level {level}",
-    "scored": "Scored {score} on a 0–{max} scale (can land between levels)."
+    "scored": "Scored {score} on a 0–{max} scale (can land between levels).",
+    "detail": "Details",
+    "detailTitle": "Answer details"
   },
   "footer": "Requests proxy through this app's server route to the API URL above. Enter the endpoint's model name; any TypeSafe-compatible API exposing /v1/systemone can be used."
 }

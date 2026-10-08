@@ -34,7 +34,7 @@ function pct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-function ConfidenceMeter({ value }: { value: number }) {
+export function ConfidenceMeter({ value }: { value: number }) {
   const dict = useI18n();
   return (
     <div className="space-y-1">
