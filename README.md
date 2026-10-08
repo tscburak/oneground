@@ -16,7 +16,7 @@ Copy `.env.example` to `.env.local` if you need to change the database path or b
 npm run dev
 ```
 
-Open http://localhost:3000/en or http://localhost:3000/tr. Playground is the first and default tab; Model Compare sits beside it. Both use the same responsive page width and padding, with reserved scrollbar space to prevent horizontal movement between tabs.
+Open http://localhost:3001/en or http://localhost:3001/tr. Playground is the first and default tab; Model Compare sits beside it. Both use the same responsive page width and padding, with reserved scrollbar space to prevent horizontal movement between tabs.
 
 The Tutorial / Öğretici button in the header starts a Driver.js tour for the current section: Playground or Model Compare. Tours support English/Turkish, previous/next steps, Escape/close, and reduced-motion preferences. Tours explain controls without changing records or starting API calls.
 
