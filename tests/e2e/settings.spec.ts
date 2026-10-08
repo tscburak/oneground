@@ -55,7 +55,7 @@ test("settings sections fit desktop and mobile", async ({ page }, testInfo) => {
   await dialog.screenshot({ path: testInfo.outputPath("models-mobile.png") });
 });
 
-test("saved models, keys and preferences survive reload and are shared with Model Compare", async ({
+test("saved models, keys and preferences survive reload and are shared with Playground", async ({
   page,
   request,
 }) => {
@@ -107,9 +107,9 @@ test("saved models, keys and preferences survive reload and are shared with Mode
       page.getByRole("tab", { name: "Bulk", exact: true }),
     ).toHaveAttribute("data-state", "active");
     await page.reload();
-    await expect(page.locator('[data-tour="playground-model"]')).toHaveValue(
-      profileId!,
-    );
+    await expect(
+      page.locator('[data-tour="playground-model"]'),
+    ).toContainText(name);
     await expect(
       page.getByRole("tab", { name: "Bulk", exact: true }),
     ).toHaveAttribute("data-state", "active");
@@ -134,11 +134,15 @@ test("saved models, keys and preferences survive reload and are shared with Mode
     ).toBeVisible();
     await page.keyboard.press("Escape");
     await page.reload();
-    await page.getByRole("tab", { name: "Model vs", exact: true }).click();
-    const compareModels = page.locator('[data-tour="compare-models"]');
-    await expect(compareModels).toContainText(`${name} renamed`);
-    await expect(compareModels).toContainText("persisted-model");
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page.locator('[data-tour="playground-model"]').click();
+    const modelMenu = page.locator('[role="menu"]');
+    await expect(modelMenu).toContainText(`${name} renamed`);
+    await expect(modelMenu).toContainText("persisted-model");
+    await page.keyboard.press("Escape");
+    await page
+      .getByRole("button", { name: "Settings", exact: true })
+      .first()
+      .click();
     await dialog.getByRole("tab", { name: "Models", exact: true }).click();
     await dialog
       .getByRole("button", { name: "Clear key", exact: true })

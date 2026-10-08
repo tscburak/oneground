@@ -6,10 +6,8 @@ import { CircleHelp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export type TourSection = "playground" | "compare";
 type Step = [string, string, string, string, string];
-const steps: Record<TourSection, Step[]> = {
-  playground: [
+const steps: Step[] = [
     [
       "playground-preset",
       "Bir örnekle başla",
@@ -33,10 +31,10 @@ const steps: Record<TourSection, Step[]> = {
     ],
     [
       "playground-model",
-      "Modeli seç",
-      "Choose a model",
-      "Veritabanına kaydedilmiş bir model profili seç. Ayarlar’dan model adı, bağlantı adresi ve API anahtarını düzenleyebilirsin.",
-      "Choose a saved model profile. Settings lets you save the model name, endpoint and API key in the database.",
+      "Modelleri seç",
+      "Choose models",
+      "Kayıtlı model profillerinden bir veya birden fazlasını seç. Birden çok model seçersen aynı girdi hepsinde çalışır ve sonuçlar yan yana karşılaştırılır.",
+      "Select one or more saved model profiles. With several selected, the same input runs on all of them and results are compared side by side.",
     ],
     [
       "playground-run",
@@ -52,39 +50,9 @@ const steps: Record<TourSection, Step[]> = {
       "Sonuç, istek ve ham cevap sekmelerini incele.",
       "Inspect results, request and raw response tabs.",
     ],
-  ],
-  compare: [
-    [
-      "compare-config",
-      "Tek girdide karşılaştır",
-      "Compare on one input",
-      "Tek bir state ve karar sorusu gir. Model karşılaştırması için dataset hazırlaman gerekmez.",
-      "Enter one state and decision question. No dataset setup needed for a model comparison.",
-    ],
-    [
-      "compare-models",
-      "Modelleri seç",
-      "Choose models",
-      "Ayarlar’da kayıtlı profillerden en az iki model seç. Aynı girdiyi eşzamanlı karşılaştırırlar.",
-      "Select at least two saved model profiles. They receive the same input for a side-by-side comparison.",
-    ],
-    [
-      "compare-run",
-      "Karşılaştırmayı çalıştır",
-      "Run the comparison",
-      "Noul, Choice veya Score sorusunu seç. Yanıt, süre, token kullanımı ve varsa tahmini maliyet sonuçlarda görünür.",
-      "Choose Noul, Choice or Score. Results show answers, latency, token usage and estimated cost when available.",
-    ],
-  ],
-};
+];
 
-export function GuidedTour({
-  section,
-  tr,
-}: {
-  section: TourSection;
-  tr: boolean;
-}) {
+export function GuidedTour({ tr }: { tr: boolean }) {
   const instance = useRef<Driver | null>(null);
   const request = useRef(0);
   const button = useRef<HTMLButtonElement>(null);
@@ -95,7 +63,7 @@ export function GuidedTour({
       instance.current?.destroy();
       instance.current = null;
     },
-    [section, tr],
+    [tr],
   );
 
   async function start() {
@@ -105,7 +73,7 @@ export function GuidedTour({
       const { driver } = await import("driver.js");
       if (request.current !== current) return;
       instance.current?.destroy();
-      const visibleSteps: DriveStep[] = steps[section].flatMap(
+      const visibleSteps: DriveStep[] = steps.flatMap(
         ([target, titleTr, titleEn, bodyTr, bodyEn]) => {
           const element = document.querySelector(`[data-tour="${target}"]`);
           if (!element || !element.getClientRects().length) return [];

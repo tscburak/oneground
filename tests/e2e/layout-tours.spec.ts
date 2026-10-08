@@ -11,13 +11,6 @@ for (const width of [1440, 390]) {
       if (request.method() === "POST") mutations.push(request.url());
     });
     await page.goto("/en");
-    const playground = page.getByRole("tab", {
-      name: "Playground",
-      exact: true,
-    });
-    await expect(playground).toHaveAttribute("data-state", "active");
-    const topTabs = page.getByRole("tablist").first().getByRole("tab");
-    await expect(topTabs.first()).toHaveText("Playground");
     const dimensions = () =>
       page.locator(".workspace-panel:visible").evaluate((element) => {
         const box = element.getBoundingClientRect();
@@ -31,7 +24,7 @@ for (const width of [1440, 390]) {
     const titles = [
       "Your input",
       "Define the decision",
-      "Choose a model",
+      "Choose models",
       "Run inference",
       "Inspect the answers",
     ];
@@ -47,15 +40,9 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByRole("button", { name: "Tutorial", exact: true }),
     ).toBeFocused();
-    await page.getByRole("tab", { name: "Model vs", exact: true }).click();
-    expect(await dimensions()).toEqual(original);
-    await page.getByRole("button", { name: "Tutorial", exact: true }).click();
-    await expect(page.locator(".driver-popover-title")).toHaveText(
-      "Compare on one input",
-    );
-    await page.keyboard.press("Escape");
-    await expect(page.locator(".driver-popover")).toHaveCount(0);
-    await playground.click();
+    await expect(
+      page.getByRole("tab", { name: "Model vs", exact: true }),
+    ).toHaveCount(0);
     expect(await dimensions()).toEqual(original);
     expect(mutations).toEqual([]);
     expect(errors).toEqual([]);
