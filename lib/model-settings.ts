@@ -221,6 +221,8 @@ export function savePreferences(change: Partial<Preferences>) {
     .transaction(() => {
       const settings = getModelSettings();
       const preferences = { ...settings.preferences, ...change };
+      if (change.defaultProfileId && change.profileIds === undefined)
+        preferences.profileIds = [change.defaultProfileId];
       if (
         preferences.defaultProfileId &&
         !settings.models.some(
@@ -232,6 +234,24 @@ export function savePreferences(change: Partial<Preferences>) {
         throw new Error(
           "Default Playground model must be a saved System One profile.",
         );
+      if (preferences.profileIds) {
+        if (
+          preferences.profileIds.length > 6 ||
+          new Set(preferences.profileIds).size !== preferences.profileIds.length
+        )
+          throw new Error(
+            "Playground models must be unique and limited to six profiles.",
+          );
+        for (const id of preferences.profileIds)
+          if (
+            !settings.models.some(
+              (profile) => profile.id === id && profile.kind === "system-one",
+            )
+          )
+            throw new Error(
+              "Playground models must be saved System One profiles.",
+            );
+      }
       db()
         .prepare("UPDATE app_settings SET body=? WHERE id='preferences'")
         .run(JSON.stringify(preferences));
@@ -245,18 +265,18 @@ export function deleteModelProfile(id: string) {
     .transaction(() => {
       db().prepare("DELETE FROM model_profiles WHERE id=?").run(id);
       const settings = getModelSettings();
-      if (settings.preferences.defaultProfileId === id) {
-        db()
-          .prepare("UPDATE app_settings SET body=? WHERE id='preferences'")
-          .run(
-            JSON.stringify({
-              ...settings.preferences,
-              defaultProfileId:
-                settings.models.find((model) => model.kind === "system-one")
-                  ?.id ?? "",
-            }),
-          );
-      }
+      const preferences = { ...settings.preferences };
+      if (preferences.profileIds?.includes(id))
+        preferences.profileIds = preferences.profileIds.filter(
+          (profileId) => profileId !== id,
+        );
+      if (settings.preferences.defaultProfileId === id)
+        preferences.defaultProfileId =
+          settings.models.find((model) => model.kind === "system-one")?.id ??
+          "";
+      db()
+        .prepare("UPDATE app_settings SET body=? WHERE id='preferences'")
+        .run(JSON.stringify(preferences));
     })
     .immediate();
   return getModelSettings();

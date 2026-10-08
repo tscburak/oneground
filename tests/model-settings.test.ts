@@ -42,6 +42,9 @@ test("Settings and encrypted model keys survive closing and reopening SQLite", (
     stateMode: "bulk",
     delimiter: "jsonl",
   });
+  assert.deepEqual(getModelSettings().preferences.profileIds, [profile.id]);
+  assert.throws(() => savePreferences({ profileIds: ["missing"] }), /System One/);
+  savePreferences({ profileIds: [profile.id] });
   const stored = db()
     .prepare("SELECT body,secret FROM model_profiles WHERE id=?")
     .get(profile.id) as { body: string; secret: string };

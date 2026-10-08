@@ -62,6 +62,10 @@ export async function POST(request: Request) {
           z
             .object({
               defaultProfileId: z.string().optional(),
+              profileIds: z
+                .array(z.string().min(1))
+                .max(6)
+                .optional(),
               stateMode: z.enum(["single", "bulk"]).optional(),
               delimiter: z
                 .enum(["newline", "comma", "semicolon", "tab", "jsonl"])

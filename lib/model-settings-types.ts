@@ -11,6 +11,7 @@ export type ModelProfile = {
 };
 export type Preferences = {
   defaultProfileId: string;
+  profileIds?: string[];
   stateMode: "single" | "bulk";
   delimiter: "newline" | "comma" | "semicolon" | "tab" | "jsonl";
 };
