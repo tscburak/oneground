@@ -1,4 +1,29 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
+
+async function ensureTwoModels(request: APIRequestContext) {
+  const settings = await (await request.get("/api/settings")).json();
+  const existing = (settings.models ?? []).filter(
+    (profile: { kind: string }) => profile.kind === "system-one",
+  ).length;
+  const created: string[] = [];
+  for (let i = existing; i < 2; i += 1) {
+    const response = await request.post("/api/settings", {
+      data: {
+        action: "save-model",
+        name: `e2e-model-${Date.now()}-${i}`,
+        kind: "system-one",
+        model: "e2e-model",
+        baseUrl: "http://127.0.0.1:8999",
+        prompt: "test",
+        inputPrice: null,
+        outputPrice: null,
+      },
+    });
+    const data = await response.json();
+    if (data.savedProfileId) created.push(data.savedProfileId);
+  }
+  return created;
+}
 
 async function selectTwoModels(page: Page) {
   const trigger = page.locator('[data-tour="playground-model"]');
@@ -19,10 +44,11 @@ test("playground compares several selected models on one state", async ({
   request,
 }) => {
   const initial = await (await request.get("/api/settings")).json();
+  const seeded = await ensureTwoModels(request);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   try {
-    await page.goto("/en");
+    await page.goto("/");
     await selectTwoModels(page);
     await page.getByRole("tab", { name: "Single", exact: true }).click();
     await page.locator('[data-tour="playground-preset"]').click();
@@ -39,6 +65,10 @@ test("playground compares several selected models on one state", async ({
       page.locator('[data-tour="playground-model"]'),
     ).toContainText("2 models");
   } finally {
+    for (const id of seeded)
+      await request.post("/api/settings", {
+        data: { action: "delete-model", id },
+      });
     await request.post("/api/settings", {
       data: { action: "preferences", ...initial.preferences },
     });
@@ -47,10 +77,11 @@ test("playground compares several selected models on one state", async ({
 
 test("bulk mode runs every selected model", async ({ page, request }) => {
   const initial = await (await request.get("/api/settings")).json();
+  const seeded = await ensureTwoModels(request);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   try {
-    await page.goto("/en");
+    await page.goto("/");
     await selectTwoModels(page);
     await page.locator('[data-tour="playground-preset"]').click();
     await page.locator('[role="option"]').nth(1).click();
@@ -69,6 +100,10 @@ test("bulk mode runs every selected model", async ({ page, request }) => {
     await expect(table.locator("tbody tr")).toHaveCount(4);
     expect(errors).toEqual([]);
   } finally {
+    for (const id of seeded)
+      await request.post("/api/settings", {
+        data: { action: "delete-model", id },
+      });
     await request.post("/api/settings", {
       data: { action: "preferences", ...initial.preferences },
     });

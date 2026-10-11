@@ -70,6 +70,7 @@ export async function POST(request: Request) {
               delimiter: z
                 .enum(["newline", "comma", "semicolon", "tab", "jsonl"])
                 .optional(),
+              locale: z.enum(["en", "tr"]).optional(),
             })
             .parse(body),
         ),

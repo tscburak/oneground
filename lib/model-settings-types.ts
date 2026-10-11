@@ -14,6 +14,7 @@ export type Preferences = {
   profileIds?: string[];
   stateMode: "single" | "bulk";
   delimiter: "newline" | "comma" | "semicolon" | "tab" | "jsonl";
+  locale: "en" | "tr";
 };
 export type ModelSettings = {
   models: ModelProfile[];

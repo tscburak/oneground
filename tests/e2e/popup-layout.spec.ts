@@ -4,7 +4,7 @@ for (const width of [1440, 390]) {
   test(`popup layout stays stable at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 720 });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/en");
+    await page.goto("/");
     const panel = page.locator(".workspace-panel:visible");
     const original = await panel.boundingBox();
     const stable = async () => {

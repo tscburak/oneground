@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
 
 type TransactionMode = "DEFERRED" | "IMMEDIATE" | "EXCLUSIVE";
 
@@ -42,11 +43,44 @@ class Database extends DatabaseSync {
 }
 
 let database: Database | undefined;
+// Writable per-user default. Published installs (npm -g, npx, Docker,
+// single binary) must not write inside the installed package directory,
+// so fall back to an OS-specific user-data dir unless ONEGROUND_DB_PATH
+// is set. Repo checkouts keep working: set ONEGROUND_DB_PATH=data/...
+// for a project-local database.
+export function defaultDatabasePath() {
+  if (process.platform === "win32") {
+    const base =
+      /* turbopackIgnore: true */ process.env.APPDATA ||
+      join(homedirOrTmp(), "AppData", "Roaming");
+    return join(base, "oneground", "oneground.sqlite");
+  }
+  if (process.platform === "darwin") {
+    return join(
+      homedirOrTmp(),
+      "Library",
+      "Application Support",
+      "oneground",
+      "oneground.sqlite",
+    );
+  }
+  const base =
+    /* turbopackIgnore: true */ process.env.XDG_DATA_HOME ||
+    join(homedirOrTmp(), ".local", "share");
+  return join(base, "oneground", "oneground.sqlite");
+}
+function homedirOrTmp() {
+  try {
+    return homedir();
+  } catch {
+    return tmpdir();
+  }
+}
 export function databasePath() {
-  return resolve(
-    /* turbopackIgnore: true */ process.env.ONEGROUND_DB_PATH ||
-      "data/oneground.sqlite",
-  );
+  const override =
+    /* turbopackIgnore: true */ process.env.ONEGROUND_DB_PATH?.trim();
+  if (override) return resolve(override);
+  return defaultDatabasePath();
 }
 export function db() {
   if (!database?.isOpen) {

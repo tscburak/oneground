@@ -98,4 +98,9 @@ test("Settings and encrypted model keys survive closing and reopening SQLite", (
   const remaining = deleteModelProfile(profile.id);
   assert.ok(!remaining.models.some((model) => model.id === profile.id));
   assert.notEqual(remaining.preferences.defaultProfileId, profile.id);
+  assert.equal(getModelSettings().preferences.locale, "en");
+  savePreferences({ locale: "tr" });
+  assert.equal(getModelSettings().preferences.locale, "tr");
+  savePreferences({ locale: "xx" as "en" });
+  assert.equal(getModelSettings().preferences.locale, "en");
 });

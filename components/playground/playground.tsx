@@ -14,6 +14,8 @@ import {
   type ResultRow,
 } from "@/components/playground/results-table";
 import { QuestionEditor } from "@/components/playground/question-editor";
+import { QuestionProfileButtons } from "@/components/question-profile-dialogs";
+import { RequestViewer } from "@/components/playground/request-viewer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,7 +39,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { PRESETS } from "@/lib/presets";
@@ -264,6 +265,29 @@ export function Playground() {
     () => parseBulkStates(bulkText, delimiter),
     [bulkText, delimiter],
   );
+  const liveQuestions = useMemo(() => buildQuestions(drafts), [drafts]);
+  const executedJson =
+    stateMode === "bulk" && bulkResults.length
+      ? JSON.stringify(
+          bulkResults.map((entry) =>
+            entry.results.map((r) => ({
+              state: r.state,
+              model: entry.model,
+              questions: entry.questions,
+            })),
+          ),
+          null,
+          2,
+        )
+      : multiResults
+        ? JSON.stringify(
+            multiResults.map((entry) => entry.request),
+            null,
+            2,
+          )
+        : result
+          ? JSON.stringify(result.request, null, 2)
+          : null;
   function clearResults() {
     setResult(null);
     setMultiResults(null);
@@ -528,7 +552,7 @@ export function Playground() {
   }
 
   return (
-    <div className="workspace-panel">
+    <div>
       {settingsError && (
         <p role="alert" className="mb-4 text-sm text-red-600">
           {settingsError}
@@ -707,10 +731,24 @@ export function Playground() {
 
           <Card data-tour="playground-questions">
             <CardHeader>
-              <CardTitle>{dict.questions.label}</CardTitle>
-              <CardDescription className="mt-1.5">
-                {dict.questions.description}
-              </CardDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle>{dict.questions.label}</CardTitle>
+                  <CardDescription className="mt-1.5">
+                    {dict.questions.description}
+                  </CardDescription>
+                </div>
+                <div data-tour="playground-profiles">
+                  <QuestionProfileButtons
+                    drafts={drafts}
+                    onLoad={(loaded) => {
+                      setDrafts(loaded.map((draft) => ({ ...draft })));
+                      clearResults();
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -757,6 +795,7 @@ export function Playground() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {drafts.length === 0 && (
@@ -872,33 +911,14 @@ export function Playground() {
               )}
             </TabsContent>
             <TabsContent value="request" className="mt-4">
-              <Card>
-                <CardContent className="py-0">
-                  <pre className="max-h-[70vh] overflow-auto p-4 font-mono text-xs leading-relaxed">
-                    {stateMode === "bulk" && bulkResults.length
-                      ? JSON.stringify(
-                          bulkResults.map((entry) =>
-                            entry.results.map((r) => ({
-                              state: r.state,
-                              model: entry.model,
-                              questions: entry.questions,
-                            })),
-                          ),
-                          null,
-                          2,
-                        )
-                      : multiResults
-                        ? JSON.stringify(
-                            multiResults.map((entry) => entry.request),
-                            null,
-                            2,
-                          )
-                        : result
-                          ? JSON.stringify(result.request, null, 2)
-                          : dict.answers.requestEmpty}
-                  </pre>
-                </CardContent>
-              </Card>
+              <RequestViewer
+                profiles={selectedProfiles}
+                stateMode={stateMode}
+                liveState={parsedState}
+                bulkStates={bulkStates}
+                liveQuestions={liveQuestions}
+                executedJson={executedJson}
+              />
             </TabsContent>
             <TabsContent value="response" className="mt-4">
               <Card>
@@ -930,11 +950,6 @@ export function Playground() {
           </Tabs>
         </div>
       </div>
-
-      <Separator className="my-10" />
-      <footer className="pb-8 text-xs text-muted-foreground">
-        {dict.footer}
-      </footer>
     </div>
   );
 }

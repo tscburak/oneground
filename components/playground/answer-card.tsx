@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Gauge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, useI18n } from "@/components/i18n";
 import {
@@ -36,16 +37,34 @@ function pct(value: number): string {
 
 export function ConfidenceMeter({ value }: { value: number }) {
   const dict = useI18n();
+  const clamped = Math.max(0, Math.min(1, value));
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{dict.answers.confidence}</span>
+    <div className="space-y-1.5 border-t border-dashed pt-3">
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <Gauge className="size-3.5" />
+          <span>{dict.answers.confidence}</span>
+          <Badge variant="outline" className="text-[10px">
+            {dict.answers.system}
+          </Badge>
+        </span>
         <span className="font-mono text-foreground">{pct(value)}</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-sm bg-muted"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(clamped * 100)}
+        title={pct(value)}
+      >
         <div
-          className="h-full rounded-full bg-foreground transition-all"
-          style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }}
+          className="h-full rounded-sm bg-muted-foreground/50"
+          style={{
+            width: `${clamped * 100}%`,
+            backgroundImage:
+              "repeating-linear-gradient(-45deg, transparent 0 4px, rgba(0,0,0,0.22) 4px 8px)",
+          }}
         />
       </div>
     </div>
@@ -89,8 +108,8 @@ function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
         <CardDescription>{dict.answers.noulDescription}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-6">
-          <div className="relative h-40 w-40 shrink-0">
+        <div className="flex flex-col gap-4">
+          <div className="relative mx-auto h-40 w-40 shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <RadialBarChart
                 data={[{ name: "yes", value }]}
@@ -108,14 +127,14 @@ function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
               <span className="text-xs text-muted-foreground">{dict.answers.pYes}</span>
             </div>
           </div>
-          <div className="space-y-3">
-            <div className="space-y-1">
+          <div className="w-full space-y-3">
+            <div className="w-full space-y-1">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{dict.answers.scaleNo}</span>
                 <span>{dict.answers.scaleMid}</span>
                 <span>{dict.answers.scaleYes}</span>
               </div>
-              <div className="relative h-1.5 w-64 overflow-hidden rounded-full bg-muted">
+              <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-foreground"
                   style={{ width: `${value * 100}%` }}
@@ -132,13 +151,13 @@ function NoulCard({ id, answer }: { id: string; answer: NoulAnswer }) {
 
 function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
   const dict = useI18n();
-  const data = Object.entries(answer.probabilities).map(([name, probability]) => ({
-    name,
-    label: name,
-    probability,
-    chosen: name === answer.choice,
-  }));
-  const chartHeight = Math.max(72, data.length * 36);
+  const data = Object.entries(answer.probabilities)
+    .map(([name, probability]) => ({
+      name,
+      probability,
+      chosen: name === answer.choice,
+    }))
+    .sort((a, b) => b.probability - a.probability);
 
   return (
     <Card>
@@ -153,36 +172,43 @@ function ChoiceCard({ id, answer }: { id: string; answer: ChoiceAnswer }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="mb-4 w-full" style={{ height: chartHeight }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              layout="vertical"
-              barCategoryGap={16}
-              margin={{ top: 4, right: 56, bottom: 4, left: 0 }}
-            >
-              <XAxis type="number" domain={[0, 1]} hide />
-              <YAxis type="category" dataKey="name" hide />
-              <Tooltip content={<ChartTooltipContent />} cursor={{ fill: "var(--muted)" }} />
-              <Bar
-                dataKey="probability"
-                radius={6}
-                barSize={14}
-                label={{
-                  position: "right",
-                  formatter: (value) => pct(Number(value)),
-                  className: "fill-muted-foreground text-xs",
-                }}
-              >
-                {data.map((entry) => (
-                  <Cell
-                    key={entry.name}
-                    fill={entry.chosen ? "var(--chart-2)" : "var(--chart-1)"}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="mb-4 w-full space-y-3">
+          {data.map((entry) => (
+            <div key={entry.name} className="w-full space-y-1">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span
+                  title={entry.name}
+                  className={cn(
+                    "min-w-0 flex-1 truncate font-mono",
+                    entry.chosen
+                      ? "font-semibold text-foreground"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {entry.name}
+                </span>
+                {entry.chosen && (
+                  <Badge variant="secondary" className="shrink-0">
+                    {dict.answers.selected}
+                  </Badge>
+                )}
+                <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                  {pct(entry.probability)}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.max(0, Math.min(1, entry.probability)) * 100}%`,
+                    background: entry.chosen
+                      ? "var(--chart-2)"
+                      : "var(--chart-1)",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
         <ConfidenceMeter value={answer.confidence} />
       </CardContent>

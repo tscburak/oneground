@@ -141,10 +141,16 @@
   display: block;
 }
 
-/* The root gutter already reserves the scrollbar width, including during
-   Radix scroll locks. Do not reserve that same space again on the body. */
+/* Radix (react-remove-scroll-bar) injects
+   `body[data-scroll-locked] { margin-right: <gap>px !important; ... }`
+   into <head> at runtime, i.e. after this stylesheet. Same specificity
+   would lose to it, so out-specify it here. The root gutter above already
+   reserves the scrollbar width while locked, which makes that compensation
+   a double shift (page jumps sideways by the scrollbar size). Where
+   `scrollbar-gutter` is unsupported the @supports block is skipped and
+   Radix compensation applies as intended. */
 @supports (scrollbar-gutter: stable) {
-  body[data-scroll-locked] {
+  html body[data-scroll-locked] {
     margin-right: 0 !important;
     --removed-body-scroll-bar-size: 0px !important;
   }

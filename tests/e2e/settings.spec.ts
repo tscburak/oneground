@@ -1,7 +1,64 @@
 import { test, expect } from "@playwright/test";
 
+test("settings manages shared question profiles", async ({ page, request }) => {
+  const name = `Settings profile ${Date.now()}`;
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  const cleanup = async () => {
+    const listed = await (await request.get("/api/eval-lab/profiles")).json();
+    for (const row of (Array.isArray(listed) ? listed : []).filter(
+      (entry: { name: string }) =>
+        String(entry.name).startsWith("Settings profile "),
+    )) {
+      await request.delete(
+        `/api/eval-lab/profiles?id=${encodeURIComponent(row.id)}`,
+      );
+    }
+  };
+  try {
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Settings", exact: true })
+      .first()
+      .click();
+    await settings.getByRole("tab", { name: "Questions", exact: true }).click();
+    await settings.getByRole("button", { name: "New", exact: true }).click();
+    const modal = page.getByRole("dialog", { name: "New question profile" });
+    await modal.getByLabel("Profile name", { exact: true }).fill(name);
+    await modal.getByRole("button", { name: "noul", exact: true }).click();
+    await modal.locator("textarea").first().fill("Settings managed?");
+    await modal
+      .getByRole("button", { name: "Save profile", exact: true })
+      .click();
+    await expect(modal).toHaveCount(0);
+    await expect(settings.getByText(name)).toBeVisible();
+    const listed = await (await request.get("/api/eval-lab/profiles")).json();
+    expect(
+      listed.some((row: { name: string }) => row.name === name),
+    ).toBe(true);
+    await settings.getByRole("button", { name: `Edit profile ${name}` }).click();
+    const editModal = page.getByRole("dialog", { name: "Edit question profile" });
+    await editModal
+      .getByLabel("Profile name", { exact: true })
+      .fill(`${name} v2`);
+    await editModal
+      .getByRole("button", { name: "Save profile", exact: true })
+      .click();
+    await expect(editModal).toHaveCount(0);
+    await expect(settings.getByText(`${name} v2`)).toBeVisible();
+    await settings.getByRole("button", { name: `Edit profile ${name} v2` }).click();
+    const deleteModal = page.getByRole("dialog", { name: "Edit question profile" });
+    await deleteModal
+      .getByRole("button", { name: "Delete profile", exact: true })
+      .click();
+    await expect(deleteModal).toHaveCount(0);
+    await expect(settings.getByText(`${name} v2`)).toHaveCount(0);
+  } finally {
+    await cleanup();
+  }
+});
+
 test("settings sections fit desktop and mobile", async ({ page }, testInfo) => {
-  await page.goto("/en");
+  await page.goto("/");
   await page
     .getByRole("button", { name: "Settings", exact: true })
     .first()
@@ -64,7 +121,7 @@ test("saved models, keys and preferences survive reload and are shared with Play
   const initial = await (await request.get("/api/settings")).json();
   let profileId: string | undefined;
   try {
-    await page.goto("/en");
+    await page.goto("/");
     await page
       .getByRole("button", { name: "Settings", exact: true })
       .first()

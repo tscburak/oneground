@@ -93,60 +93,14 @@ function initialize() {
         db().prepare("SELECT id FROM app_settings WHERE id='preferences'").get()
       )
         return;
-      const seeds = [
-        {
-          id: "system-one-hosted",
-          name: "System One hosted",
-          kind: "system-one" as const,
-          model: "jev-latest",
-          baseUrl: "https://api.typesafe.ai",
-          apiKey: process.env.TYPESAFE_API_KEY,
-        },
-        {
-          id: "system-one-local",
-          name: "System One local",
-          kind: "system-one" as const,
-          model: "jev-latest",
-          baseUrl: process.env.KEV_BASE_URL || "http://127.0.0.1:8008",
-          apiKey: process.env.LOCAL_SYSTEM_ONE_API_KEY,
-        },
-        ...(process.env.LLM_API_KEY
-          ? [
-              {
-                id: "llm-imported",
-                name: "LLM",
-                kind: "llm" as const,
-                model: process.env.LLM_MODEL || "",
-                baseUrl:
-                  process.env.LLM_BASE_URL || "https://api.openai.com/v1",
-                apiKey: process.env.LLM_API_KEY,
-              },
-            ]
-          : []),
-      ];
-      for (const { apiKey, ...seed } of seeds) {
-        const profile: StoredProfile = {
-          ...seed,
-          baseUrl: canonicalEndpoint(seed.baseUrl),
-          prompt: "Apply the question definitions consistently.",
-          inputPrice: null,
-          outputPrice: null,
-        };
-        db()
-          .prepare("INSERT OR IGNORE INTO model_profiles VALUES (?,?,?)")
-          .run(
-            profile.id,
-            JSON.stringify(profile),
-            apiKey?.trim() ? encrypt(apiKey.trim()) : null,
-          );
-      }
       db()
         .prepare("INSERT INTO app_settings VALUES ('preferences',?)")
         .run(
           JSON.stringify({
-            defaultProfileId: "system-one-hosted",
+            defaultProfileId: "",
             stateMode: "single",
             delimiter: "newline",
+            locale: "en",
           } satisfies Preferences),
         );
     })
@@ -221,6 +175,8 @@ export function savePreferences(change: Partial<Preferences>) {
     .transaction(() => {
       const settings = getModelSettings();
       const preferences = { ...settings.preferences, ...change };
+      if (preferences.locale !== "en" && preferences.locale !== "tr")
+        preferences.locale = "en";
       if (change.defaultProfileId && change.profileIds === undefined)
         preferences.profileIds = [change.defaultProfileId];
       if (
