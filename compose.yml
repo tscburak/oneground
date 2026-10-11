@@ -1,0 +1,18 @@
+services:
+  oneground:
+    build: .
+    image: oneground:latest
+    ports:
+      - "3001:3000"
+    volumes:
+      - oneground-data:/data
+    environment:
+      # Bootstrap values, imported into SQLite once on first start.
+      # Manage keys/models through Settings afterwards.
+      - KEV_BASE_URL=${KEV_BASE_URL:-http://host.docker.internal:8008}
+      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
+      - ONEGROUND_SETTINGS_KEY=${ONEGROUND_SETTINGS_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  oneground-data:
