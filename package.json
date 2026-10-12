@@ -1,6 +1,6 @@
 {
   "name": "oneground",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": false,
   "description": "Open-source playground and evaluation toolkit for testing, comparing, and benchmarking decision models before integration.",
   "keywords": [
@@ -25,7 +25,7 @@
     "README.md"
   ],
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -p 3180",
     "build": "next build && node scripts/copy-standalone-assets.mjs",
     "prepack": "npm run build",
     "start": "next start",

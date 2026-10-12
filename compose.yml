@@ -3,7 +3,7 @@ services:
     build: .
     image: oneground:latest
     ports:
-      - "3001:3000"
+      - "3180:3000"
     volumes:
       - oneground-data:/data
     environment:

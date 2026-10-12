@@ -14,13 +14,13 @@ npx oneground@latest --open
 
 `npx` (no install, always fresh) is the recommended way to run releases.
 `npm i -g oneground` works too, then run `oneground --open`. Flags:
-`--port 3001`, `--hostname 127.0.0.1`, `--db-path <file>`, `--open`.
+`--port 3180`, `--hostname 127.0.0.1`, `--db-path <file>`, `--open`.
 
 Docker (reproducible, no Node toolchain on the host):
 
 ```sh
 docker compose up --build
-# or: docker run -p 3001:3000 -v oneground-data:/data ghcr.io/tscburak/oneground
+# or: docker run -p 3180:3000 -v oneground-data:/data ghcr.io/tscburak/oneground
 ```
 
 From source:
@@ -30,7 +30,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3001/. Playground is the first and default tab; Eval Lab sits beside it. The interface language (English/Türkçe) is stored with the other preferences in SQLite and switched from Settings → Preferences; no locale path prefix is used. Both use the same responsive page width and padding, with reserved scrollbar space to prevent horizontal movement between tabs.
+Open http://localhost:3180/. Playground is the first and default tab; Eval Lab sits beside it. The interface language (English/Türkçe) is stored with the other preferences in SQLite and switched from Settings → Preferences; no locale path prefix is used. Both use the same responsive page width and padding, with reserved scrollbar space to prevent horizontal movement between tabs.
 
 The Tutorial / Öğretici button in the header starts a Driver.js tour for the Playground. Tours support English/Turkish, previous/next steps, Escape/close, and reduced-motion preferences. Tours explain controls without changing records or starting API calls.
 

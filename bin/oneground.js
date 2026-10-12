@@ -8,7 +8,7 @@ const { existsSync, readFileSync } = require("node:fs");
 const { dirname, join, resolve } = require("node:path");
 
 const APP_ROOT = resolve(dirname(__filename), "..");
-const DEFAULT_PORT = 3001;
+const DEFAULT_PORT = 3180;
 const DEFAULT_HOSTNAME = "127.0.0.1";
 
 function fail(message) {
@@ -31,7 +31,7 @@ function help() {
 Start the local OneGround workspace (Playground + Eval Lab).
 
 Options:
-  -p, --port <n>      Port to listen on (default: 3001, env: PORT)
+  -p, --port <n>      Port to listen on (default: 3180, env: PORT)
   -H, --hostname <h>  Hostname to bind (default: 127.0.0.1, env: HOSTNAME)
       --db-path <p>   SQLite file location (env: ONEGROUND_DB_PATH)
       --open          Open the workspace in the default browser
