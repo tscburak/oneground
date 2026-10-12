@@ -1,0 +1,19 @@
+# npm reads this file INSTEAD of .gitignore on publish.
+# Intent: allow .next/standalone/ (listed in package.json `files`)
+# while .gitignore hides /.next/ in git.
+# So: everything git-ignored EXCEPT .next/standalone is re-ignored here.
+node_modules/
+data/
+test-results/
+playwright-report/
+coverage/
+.git/
+.env*
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+*.pem
+npm-debug.log*
+.vercel/
+out/
+build/

@@ -1,0 +1,103 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          cache: npm
+
+      # Trusted Publishing requires npm >= 11.5.1; use latest for reliable OIDC matching.
+      - name: Upgrade npm
+        run: |
+          npm install --global npm@latest
+          node --version
+          npm --version
+
+      # setup-node (or a repo secret) exports NODE_AUTH_TOKEN; any value here
+      # makes npm use token auth and skip OIDC trusted publishing entirely.
+      # Clear it so npm falls back to OIDC.
+      - name: Clear NODE_AUTH_TOKEN for OIDC
+        run: |
+          echo "token length before clear: ${#NODE_AUTH_TOKEN}"
+          echo "NODE_AUTH_TOKEN=" >> "$GITHUB_ENV"
+
+      - name: Debug OIDC environment
+        run: |
+          node --version
+          npm --version
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then echo "OIDC ENV MISSING"; else echo "OIDC ENV present"; fi
+          if [ -z "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" ]; then echo "OIDC REQUEST TOKEN MISSING"; else echo "OIDC REQUEST TOKEN present"; fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NODE_AUTH_TOKEN unset (expected for OIDC)"; else echo "NODE_AUTH_TOKEN set (unexpected)"; fi
+
+      # Prints only the non-secret sub/repository claims to check for
+      # immutable subject format (npm/cli#9969). Never prints the token.
+      - name: Show OIDC sub claim
+        run: |
+          curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm%3Aregistry.npmjs.org" | node -p "(()=>{const v=JSON.parse(require('fs').readFileSync(0,'utf8')).value;const p=JSON.parse(Buffer.from(v.split('.')[1],'base64').toString());return 'sub='+p.sub;})()"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches package version
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "package.json: $PKG_VERSION, tag: $TAG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Tag (${GITHUB_REF_NAME}) does not match package.json version (${PKG_VERSION})."
+            exit 1
+          fi
+
+      - name: Check published version
+        id: check
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set +e
+          CLEAN_VERSION="${VERSION#v}"
+          npm view "oneground@${CLEAN_VERSION}" version >/dev/null 2>&1
+          result=$?
+          set -e
+
+          if [ "$result" -eq 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "oneground@${CLEAN_VERSION} is already published."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "oneground@${CLEAN_VERSION} was not found; publishing will be attempted."
+          fi
+
+      - name: Build
+        if: steps.check.outputs.exists == 'false'
+        run: npm run build --if-present
+
+      - name: Publish to npm
+        if: steps.check.outputs.exists == 'false'
+        run: npm publish --provenance --access public
+
+      - name: Show npm debug log on failure
+        if: failure()
+        run: cat ~/.npm/_logs/*-debug-*.log 2>/dev/null | tail -n 120
