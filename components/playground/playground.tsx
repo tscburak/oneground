@@ -716,14 +716,14 @@ export function Playground() {
                   value={stateText}
                   onChange={(e) => setStateText(e.target.value)}
                   placeholder={dict.state.placeholder}
-                  className="min-h-40 font-mono text-xs"
+                  className="max-h-72 min-h-40 font-mono text-xs"
                 />
               ) : (
                 <Textarea
                   value={bulkText}
                   onChange={(e) => setBulkText(e.target.value)}
                   placeholder={dict.bulk.placeholder}
-                  className="min-h-40 font-mono text-xs"
+                  className="max-h-72 min-h-40 font-mono text-xs"
                 />
               )}
             </CardContent>
