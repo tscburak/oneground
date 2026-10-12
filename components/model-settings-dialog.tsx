@@ -85,7 +85,8 @@ export function ModelSettingsDialog({
     [clearKey, setClearKey] = useState(false),
     [showKey, setShowKey] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [mOpen, setMOpen] = useState(false);
   function edit(profile?: ModelProfile) {
     setDraft(profile ?? blank());
     setApiKey("");
@@ -251,11 +252,26 @@ export function ModelSettingsDialog({
         clearApiKey: clearKey,
       });
       edit(data.models.find((profile) => profile.id === data.savedProfileId));
+      setMOpen(false);
       toast.success(
         t("Model ve ayarlar kaydedildi", "Model and settings saved"),
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteModel() {
+    if (!draft.id) return;
+    setBusy(true);
+    setError("");
+    try {
+      await mutate({ action: "delete-model", id: draft.id });
+      edit();
+      setMOpen(false);
+    } catch (e) {
+      setError(String(e));
     } finally {
       setBusy(false);
     }
@@ -354,7 +370,10 @@ export function ModelSettingsDialog({
                       variant="outline"
                       size="sm"
                       disabled={busy}
-                      onClick={() => edit()}
+                      onClick={() => {
+                        edit();
+                        setMOpen(true);
+                      }}
                     >
                       <Plus className="size-4" />
                       {t("Yeni", "New")}
@@ -370,7 +389,10 @@ export function ModelSettingsDialog({
                         type="button"
                         disabled={busy}
                         aria-pressed={draft.id === profile.id}
-                        onClick={() => edit(profile)}
+                        onClick={() => {
+                          edit(profile);
+                          setMOpen(true);
+                        }}
                         className="min-w-0 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-muted aria-pressed:border-foreground/30 aria-pressed:bg-muted disabled:opacity-50"
                       >
                         <span className="block text-sm font-medium break-all">
@@ -387,15 +409,44 @@ export function ModelSettingsDialog({
                       </p>
                     )}
                   </div>
-                  <fieldset
-                    disabled={busy}
-                    className="min-w-0 space-y-4 border-t pt-5"
-                  >
-                    <legend className="sr-only">
+                  <p className="text-xs text-muted-foreground">
+                    {t(
+                      "API anahtarları güvenle saklanır ve tarayıcıya geri gönderilmez.",
+                      "API keys are stored securely and never returned to the browser.",
+                    )}
+                  </p>
+                </div>
+              </ScrollArea>
+              <Dialog
+                open={mOpen}
+                onOpenChange={(open) => {
+                  if (!open) setMOpen(false);
+                }}
+              >
+                <DialogContent
+                  className="sm:max-w-2xl"
+                  aria-label={
+                    draft.id
+                      ? t("Modeli düzenle", "Edit model")
+                      : t("Yeni model", "New model")
+                  }
+                >
+                  <DialogHeader>
+                    <DialogTitle>
                       {draft.id
                         ? t("Modeli düzenle", "Edit model")
                         : t("Yeni model", "New model")}
-                    </legend>
+                    </DialogTitle>
+                  </DialogHeader>
+                  {error && (
+                    <p role="alert" className="text-sm text-red-600">
+                      {error}
+                    </p>
+                  )}
+                  <fieldset
+                    disabled={busy}
+                    className="max-h-[60dvh] space-y-4 overflow-y-auto pr-1"
+                  >
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="grid gap-1 text-sm">
                         {t("Profil adı", "Profile name")}
@@ -556,7 +607,27 @@ export function ModelSettingsDialog({
                         </div>
                       </div>
                     </details>
-                    <div className="flex flex-wrap gap-2">
+                  </fieldset>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+                    <div>
+                      {draft.id && (
+                        <Button
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() => void deleteModel()}
+                        >
+                          <Trash2 className="size-4" />
+                          {t("Modeli sil", "Delete model")}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setMOpen(false)}
+                      >
+                        {t("Kapat", "Close")}
+                      </Button>
                       <Button
                         disabled={
                           busy || !draft.name.trim() || !draft.model.trim()
@@ -565,38 +636,10 @@ export function ModelSettingsDialog({
                       >
                         {t("Modeli kaydet", "Save model")}
                       </Button>
-                      {draft.id && (
-                        <Button
-                          variant="outline"
-                          disabled={busy}
-                          onClick={async () => {
-                            setBusy(true);
-                            try {
-                              await mutate({
-                                action: "delete-model",
-                                id: draft.id,
-                              });
-                              edit();
-                            } catch (e) {
-                              setError(String(e));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {t("Modeli sil", "Delete model")}
-                        </Button>
-                      )}
                     </div>
-                  </fieldset>
-                  <p className="text-xs text-muted-foreground">
-                    {t(
-                      "API anahtarları güvenle saklanır ve tarayıcıya geri gönderilmez.",
-                      "API keys are stored securely and never returned to the browser.",
-                    )}
-                  </p>
-                </div>
-              </ScrollArea>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
             <TabsContent
               value="questions"
@@ -688,6 +731,11 @@ export function ModelSettingsDialog({
                       : t("Yeni soru profili", "New question profile")}
                   </DialogTitle>
                 </DialogHeader>
+                {error && (
+                  <p role="alert" className="text-sm text-red-600">
+                    {error}
+                  </p>
+                )}
                 {qEdit && (
                   <div className="max-h-[60dvh] space-y-4 overflow-y-auto pr-1">
                     <label className="grid gap-1 text-sm">
