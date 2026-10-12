@@ -159,7 +159,8 @@ async function main() {
   checkNode();
   const args = parseArgs(process.argv.slice(2));
   const explicitPort = args.port !== undefined;
-  const wanted = args.port ?? Number(process.env.PORT) ?? DEFAULT_PORT;
+  const envPort = process.env.PORT ? Number(process.env.PORT) : undefined;
+  const wanted = args.port ?? envPort ?? DEFAULT_PORT;
   if (!Number.isInteger(wanted) || wanted < 1 || wanted > 65535)
     fail(`invalid port: ${wanted}`);
   const hostname =
