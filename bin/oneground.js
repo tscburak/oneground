@@ -188,7 +188,7 @@ async function main() {
   });
 
   const displayHost = hostname === "0.0.0.0" ? "127.0.0.1" : hostname;
-  const url = `http://${displayHost}:${port}/en`;
+  const url = `http://${displayHost}:${port}/`;
   process.stdout.write(
     `OneGround (${target.mode}) running at ${url}\n` +
       `Database: ${process.env.ONEGROUND_DB_PATH ?? "<user-data default>"}\n`,
