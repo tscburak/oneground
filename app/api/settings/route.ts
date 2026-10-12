@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSameOrigin } from "@/lib/origin";
 import {
   deleteModelProfile,
   getModelSettings,
@@ -21,8 +22,7 @@ export async function GET() {
 }
 export async function POST(request: Request) {
   try {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    if (!isSameOrigin(request))
       return Response.json(
         { error: "Cross-origin settings changes are not allowed." },
         { status: 403 },

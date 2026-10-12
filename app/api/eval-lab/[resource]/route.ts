@@ -5,6 +5,7 @@ import {
   parseResource,
   updateEvalEntry,
 } from "@/lib/eval-lab/store";
+import { isSameOrigin } from "@/lib/origin";
 
 export const runtime = "nodejs";
 
@@ -30,8 +31,7 @@ export async function GET(_request: Request, context: Context) {
 export async function POST(request: Request, context: Context) {
   try {
     const resource = await resourceOf(context);
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    if (!isSameOrigin(request))
       return Response.json(
         { error: "Cross-origin eval library changes are not allowed." },
         { status: 403 },
@@ -58,8 +58,7 @@ export async function POST(request: Request, context: Context) {
 export async function PUT(request: Request, context: Context) {
   try {
     const resource = await resourceOf(context);
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    if (!isSameOrigin(request))
       return Response.json(
         { error: "Cross-origin eval library changes are not allowed." },
         { status: 403 },
