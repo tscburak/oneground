@@ -1,6 +1,6 @@
 {
   "name": "oneground",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": false,
   "description": "Open-source playground and evaluation toolkit for testing, comparing, and benchmarking decision models before integration.",
   "keywords": [
