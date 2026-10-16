@@ -111,12 +111,9 @@ export function ResultsTable({
             return (
               <tr key={row.key} className="border-b align-top last:border-b-0">
                 {showState && row.stateSpan !== undefined && (
-                  <td
-                    rowSpan={row.stateSpan}
-                    className="max-w-72 px-3 py-2 align-top"
-                  >
+                  <td rowSpan={row.stateSpan} className="px-3 py-2 align-top">
                     <span
-                      className="block truncate font-mono text-xs"
+                      className="block w-72 truncate font-mono text-xs"
                       title={
                         row.state !== undefined
                           ? previewState(row.state, 1000)
@@ -128,10 +125,10 @@ export function ResultsTable({
                   </td>
                 )}
                 <td className="px-3 py-2">
-                  <span className="block font-mono text-xs">{row.model}</span>
+                  <span className="block whitespace-nowrap font-mono text-xs">{row.model}</span>
                 </td>
                 {answerOrder.map((id) => (
-                  <td key={id} className="px-3 py-2">
+                  <td key={id} className="whitespace-nowrap px-3 py-2">
                     {row.status === "done" && row.answers[id] ? (
                       <AnswerCell answer={row.answers[id]} />
                     ) : (
@@ -156,7 +153,7 @@ export function ResultsTable({
                   </span>
                   {row.status === "error" && row.error && (
                     <span
-                      className="block max-w-56 truncate text-xs text-red-600 dark:text-red-400"
+                      className="block w-56 truncate text-xs text-red-600 dark:text-red-400"
                       title={row.error}
                     >
                       {row.error}
