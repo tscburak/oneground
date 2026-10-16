@@ -4,6 +4,9 @@
 
 Open-source playground and evaluation toolkit for testing, comparing, and benchmarking decision models before integration.
 
+
+<img width="1381" height="895" alt="image" src="https://github.com/user-attachments/assets/d7766ebd-5f72-411c-9ef0-9fe57f96ef5d" />
+
 ## Run
 
 Requires Node.js 22.5+.
